@@ -106,7 +106,7 @@
 | 名前 | 仕様 |
 | :--- | :--- |
 | Status rail | 高さ 52dp。左に 8dp の LED + 状態テキスト（接続済み / 接続待ち / エラー / 未接続）+ ローカルネーム（mono）、右に送信間隔（mono） |
-| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭。状態は必ず隣のテキストでも示す |
+| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭。状態は必ず隣のテキストでも示す。LED 自体は semantics から除外し、状態テキストで読み上げる |
 | Fix quality bars | 3×10dp のバー 4 本（`ink` / `line`）+ 「高/良/中/低/測位なし」テキスト |
 | Readout plate | `surface`、上角丸 16dp、内側 16dp パディング。座標は小数 7 桁、TalkBack は「北緯 …、東経 …」 |
 | Primary action | 高さ 52dp、角丸 10dp、`pine` 塗り / `onPrimary` 文字、押下 0.98 スケール |
@@ -118,7 +118,7 @@
 - fix 到着時: 座標数字の **120ms クロスフェード**のみ（スライドイン禁止）。
 - 主ボタン押下: 0.98 スケール（120ms）。
 - Reduce Motion（`Settings.Global.ANIMATOR_DURATION_SCALE == 0`）時はすべて無効化。設定変更は画面再生成まで反映されない。
-- LED のパルスは Sender 画面では使わない（root `DESIGN.md` の LED パルスは Receiver の接続中を指す）。
+- LED パルスは使用しない（root `DESIGN.md` v1.0.1 でパルスは削除され、LED は静的表示 + 状態テキスト併記が正）。
 
 ## Copy
 

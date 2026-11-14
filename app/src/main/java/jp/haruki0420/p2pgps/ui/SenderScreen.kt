@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -253,9 +252,11 @@ private fun railStatus(state: SenderState): RailStatus {
 
 @Composable
 private fun LedIndicator(status: RailStatus) {
+    // 状態は隣の可視テキストで読み上げるため、LED 自体は semantics から除外する
+    // （同じ内容の二重読み上げを避ける）。
     val base = Modifier
         .size(8.dp)
-        .semantics { contentDescription = status.label }
+        .clearAndSetSemantics {}
     Box(
         modifier = if (status.outlined) {
             base.border(1.dp, status.color, CircleShape)

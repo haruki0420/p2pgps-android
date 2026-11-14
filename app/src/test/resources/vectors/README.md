@@ -6,7 +6,7 @@ Android 実装の encode / decode / validate を仕様の値と突き合わせ�
 ## 由来
 
 - 正本: `p2pgps-protocol` リポジトリの `tests/vectors/`
-- ミラー元コミット: `654ae56`（+ 仕様 §5.1 明確化に伴う Control interval ベクタの更新を含む）
+- ミラー元コミット: `a8d482a`（§5.1 対応後。Control interval ベクタは生値 `hex` + `normalized_interval_ms` 形式）
 - 対象: `location.json`（13 ベクタ）、`extended.json`（5）、`status.json`（5）、`control.json`（22）、`sequences.json`（5 シナリオ）
 
 ## 同期方法

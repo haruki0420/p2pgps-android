@@ -209,9 +209,13 @@ class GpsSenderService : Service() {
 
     private fun startSender() {
         AppLog.i(TAG, "送信を開始します")
-        if (!locationProvider.hasPermission()) {
+        // UI と同じく FINE を必須にする。coarse のみでサービスが起動された場合
+        // （通知や外部からの startService など）は GPS を購読できず、NETWORK の fix も
+        // 精度不足でフィルタに落ちるため「測位待ち」のままになる。ここで明示的に
+        // エラーにして権限の再許可を促す。
+        if (!locationProvider.hasFinePermission()) {
             lastErrorMessage =
-                "位置情報の権限がありません。権限を許可してから、もう一度送信を開始してください。"
+                "正確な位置情報の権限がありません。位置情報（正確）を許可してから、もう一度送信を開始してください。"
             publishState(forceNotification = true)
             return
         }

@@ -1,7 +1,8 @@
 package jp.haruki0420.p2pgps.protocol
 
 import kotlin.math.abs
-import kotlin.math.roundToInt
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Location Packet（20 bytes 固定）。仕様 §3。
@@ -147,8 +148,18 @@ data class LocationPacket(
          * 度を仕様の int32（× 10^7）へ変換する。
          *
          * 例: 35.6812360 → 356812360
+         *
+         * 丸めは Python 参照実装の `ROUND_HALF_UP` に合わせ、.5 は 0 から遠ざかる方向へ丸める
+         * （[kotlin.math.roundToInt] は .5 を +∞ 方向へ丸めるため使わない）。
          */
-        fun encodeCoordinate(degrees: Double): Int = (degrees * COORDINATE_SCALE).roundToInt()
+        fun encodeCoordinate(degrees: Double): Int {
+            val scaled = degrees * COORDINATE_SCALE
+            return if (scaled >= 0.0) {
+                floor(scaled + 0.5).toInt()
+            } else {
+                ceil(scaled - 0.5).toInt()
+            }
+        }
 
         /** 仕様の int32（× 10^7）を度へ変換する。 */
         fun decodeCoordinate(scaled: Int): Double = scaled / COORDINATE_SCALE

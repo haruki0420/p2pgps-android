@@ -32,7 +32,8 @@ class LocationFilter(
             return FilterResult.Rejected("座標が数値ではありません")
         }
         if (fix.latitude !in -90.0..90.0 || fix.longitude !in -180.0..180.0) {
-            return FilterResult.Rejected("座標が範囲外です (${fix.latitude}, ${fix.longitude})")
+            // 座標値そのものはログへ流さない（AppLog のプライバシー方針）。
+            return FilterResult.Rejected("座標が範囲外です")
         }
         if (!fix.accuracyMeters.isFinite() || fix.accuracyMeters <= 0f) {
             return FilterResult.Rejected("精度が不明です")

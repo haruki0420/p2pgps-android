@@ -13,11 +13,13 @@ data class PermissionStatus(
     val coarseLocation: Boolean,
     val bluetoothAdvertise: Boolean,
     val bluetoothConnect: Boolean,
-    val bluetoothScan: Boolean,
     val notifications: Boolean,
 ) {
-    /** FINE または COARSE のどちらかがあれば位置情報を取得できる。 */
+    /** 位置情報の権限（FINE または COARSE）があるか。 */
     val locationGranted: Boolean get() = fineLocation || coarseLocation
+
+    /** COARSE のみ許可されている（正確な位置情報が無い）状態か。 */
+    val coarseOnly: Boolean get() = coarseLocation && !fineLocation
 
     /** Android 12 以降は BLUETOOTH_ADVERTISE / CONNECT が実行時権限。 */
     val bluetoothGranted: Boolean
@@ -35,8 +37,14 @@ data class PermissionStatus(
             true
         }
 
-    /** 送信開始に必須の権限が揃っているか（通知は必須にしない）。 */
-    val canStart: Boolean get() = locationGranted && bluetoothGranted
+    /**
+     * 送信開始に必須の権限が揃っているか。
+     *
+     * FINE を必須にしている。COARSE のみでは GPS を購読できず、NETWORK の fix も
+     * 精度不足でフィルタに落ちるため、実質的に測位できない。
+     * 通知は必須にしない（拒否されても送信は継続できる）。
+     */
+    val canStart: Boolean get() = fineLocation && bluetoothGranted
 
     val allGranted: Boolean get() = canStart && notificationsGranted
 }
@@ -51,7 +59,6 @@ object Permissions {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_ADVERTISE)
             add(Manifest.permission.BLUETOOTH_CONNECT)
-            add(Manifest.permission.BLUETOOTH_SCAN)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
@@ -66,7 +73,6 @@ object Permissions {
         coarseLocation = granted(context, Manifest.permission.ACCESS_COARSE_LOCATION),
         bluetoothAdvertise = granted(context, Manifest.permission.BLUETOOTH_ADVERTISE),
         bluetoothConnect = granted(context, Manifest.permission.BLUETOOTH_CONNECT),
-        bluetoothScan = granted(context, Manifest.permission.BLUETOOTH_SCAN),
         notifications = granted(context, Manifest.permission.POST_NOTIFICATIONS),
     )
 

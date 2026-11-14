@@ -68,6 +68,7 @@ class GpsSenderService : Service() {
     private var lastError = StatusError.NONE
     private var lastErrorMessage: String? = null
     private var lastNotifiedStatus: ByteArray? = null
+    private var lastNotificationAtMillis = 0L
 
     private var streamJob: Job? = null
     private var locationJob: Job? = null
@@ -88,7 +89,7 @@ class GpsSenderService : Service() {
             gattServer.state.collect { ble ->
                 SenderStateHolder.update { it.copy(ble = ble) }
                 notifyStatus()
-                publishState()
+                publishState(forceNotification = true)
             }
         }
         heartbeatJob = scope.launch {
@@ -117,7 +118,7 @@ class GpsSenderService : Service() {
                 intervalMs = ControlCommand.clampInterval(requested)
                 AppLog.i(TAG, "送信間隔を変更しました: ${intervalMs}ms")
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
 
             ACTION_SIMULATE -> {
@@ -136,19 +137,19 @@ class GpsSenderService : Service() {
                     )
                     AppLog.i(TAG, "シミュレート位置を設定しました")
                     if (streaming) sendLocationPacket()
-                    publishState()
+                    publishState(forceNotification = true)
                 } else {
                     AppLog.w(TAG, "シミュレート位置が不正です")
                     lastErrorMessage =
                         "シミュレート位置が不正です。緯度は -90〜90、経度は -180〜180 の数値で入力してください。"
-                    publishState()
+                    publishState(forceNotification = true)
                 }
             }
 
             ACTION_CLEAR_SIMULATION -> {
                 simulatedFix = null
                 AppLog.i(TAG, "シミュレート位置を解除しました")
-                publishState()
+                publishState(forceNotification = true)
             }
 
             else -> startSender()
@@ -208,16 +209,22 @@ class GpsSenderService : Service() {
 
     private fun startSender() {
         AppLog.i(TAG, "送信を開始します")
+        if (!locationProvider.hasPermission()) {
+            lastErrorMessage =
+                "位置情報の権限がありません。権限を許可してから、もう一度送信を開始してください。"
+            publishState(forceNotification = true)
+            return
+        }
         if (!gattServer.start()) {
             lastErrorMessage = gattServer.state.value.lastError
-            publishState()
+            publishState(forceNotification = true)
             return
         }
         startLocationUpdates()
         streaming = true
         ensureStreamLoop()
         notifyStatus(force = true)
-        publishState()
+        publishState(forceNotification = true)
     }
 
     private fun stopSender() {
@@ -229,7 +236,7 @@ class GpsSenderService : Service() {
         if (this::gattServer.isInitialized) {
             gattServer.stopAdvertising()
         }
-        publishState()
+        publishState(forceNotification = true)
     }
 
     private fun startLocationUpdates() {
@@ -358,7 +365,7 @@ class GpsSenderService : Service() {
         val verticalAccuracy = fix.verticalAccuracyMeters
             ?.takeIf { it.isFinite() && it >= 0f }
             ?.roundToInt()
-            ?.coerceIn(0, 254)
+            ?.takeIf { it in 0..254 }
             ?: ExtendedPacket.UNKNOWN_U8
         return ExtendedPacket(
             provider = provider.code,
@@ -408,7 +415,7 @@ class GpsSenderService : Service() {
         gattServer.notifyStatus(packet)
     }
 
-    private fun publishState() {
+    private fun publishState(forceNotification: Boolean = false) {
         if (!this::gattServer.isInitialized) return
         val battery = BatteryStatus.read(this)
         val fix = simulatedFix ?: latestFix
@@ -432,11 +439,16 @@ class GpsSenderService : Service() {
             lastErrorMessage = lastErrorMessage,
         )
         SenderStateHolder.update { state }
-        updateNotification(state)
+        updateNotification(state, force = forceNotification)
     }
 
-    private fun updateNotification(state: SenderState) {
+    private fun updateNotification(state: SenderState, force: Boolean = false) {
         if (!isForeground) return
+        // 位置 fix ごと（1 Hz）の通知更新はバッテリーを消費するため 2 秒に 1 回へ間引く。
+        // 状態変化（START/STOP/エラー/接続変化）は force で即時反映する。
+        val now = System.currentTimeMillis()
+        if (!force && now - lastNotificationAtMillis < NOTIFICATION_UPDATE_INTERVAL_MS) return
+        lastNotificationAtMillis = now
         try {
             NotificationManagerCompat.from(this).notify(
                 NotificationHelper.NOTIFICATION_ID,
@@ -447,13 +459,19 @@ class GpsSenderService : Service() {
         }
     }
 
+    /** 成功した Control コマンドで last_error をクリアする（仕様 §6）。 */
+    private fun clearError() {
+        lastError = StatusError.NONE
+        lastErrorMessage = null
+    }
+
     private fun setError(error: StatusError, message: String) {
         if (lastError == error) return
         lastError = error
         lastErrorMessage = message
         AppLog.w(TAG, message)
         notifyStatus(force = true)
-        publishState()
+        publishState(forceNotification = true)
     }
 
     private fun handleControlCommand(command: ControlCommand) {
@@ -465,35 +483,38 @@ class GpsSenderService : Service() {
             is ControlCommand.Start -> {
                 intervalMs = command.intervalMs
                 streaming = true
-                lastError = StatusError.NONE
-                lastErrorMessage = null
+                clearError()
                 ensureStreamLoop()
                 AppLog.i(TAG, "START: interval=${intervalMs}ms")
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
 
             is ControlCommand.Stop -> {
                 streaming = false
+                clearError()
                 AppLog.i(TAG, "STOP")
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
 
             is ControlCommand.SetInterval -> {
                 intervalMs = command.intervalMs
+                clearError()
                 AppLog.i(TAG, "SET_INTERVAL: ${intervalMs}ms")
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
 
             is ControlCommand.RequestFix -> {
+                clearError()
                 AppLog.i(TAG, "REQUEST_FIX")
                 sendLocationPacket()
             }
 
             is ControlCommand.SetExtended -> {
                 extendedEnabled = command.enabled
+                clearError()
                 AppLog.i(TAG, "SET_EXTENDED: ${command.enabled}")
                 if (command.enabled) {
                     val fix = simulatedFix ?: latestFix
@@ -504,18 +525,17 @@ class GpsSenderService : Service() {
                     }
                 }
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
 
             is ControlCommand.Reset -> {
                 intervalMs = ControlCommand.DEFAULT_INTERVAL_MS
                 extendedEnabled = false
                 sequence = 0
-                lastError = StatusError.NONE
-                lastErrorMessage = null
+                clearError()
                 AppLog.i(TAG, "RESET")
                 notifyStatus(force = true)
-                publishState()
+                publishState(forceNotification = true)
             }
         }
     }
@@ -526,13 +546,16 @@ class GpsSenderService : Service() {
             lastErrorMessage = null
             AppLog.w(TAG, "Control コマンドのエラー: $error")
             notifyStatus(force = true)
-            publishState()
+            publishState(forceNotification = true)
         }
     }
 
     companion object {
         private const val TAG = "GpsSenderService"
         private const val STATUS_HEARTBEAT_MS = 10_000L
+
+        /** 位置 fix ごとの通知更新を間引く間隔。 */
+        private const val NOTIFICATION_UPDATE_INTERVAL_MS = 2_000L
 
         const val ACTION_START = "jp.haruki0420.p2pgps.action.START"
         const val ACTION_STOP = "jp.haruki0420.p2pgps.action.STOP"

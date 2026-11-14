@@ -6,12 +6,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.haruki0420.p2pgps.core.AppLog
 import jp.haruki0420.p2pgps.core.SenderStateHolder
 import jp.haruki0420.p2pgps.service.NotificationHelper
@@ -31,12 +35,24 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.ensureChannel(this)
         setContent {
             P2PGpsTheme {
-                val state by SenderStateHolder.state.collectAsState()
-                val logs by AppLog.entries.collectAsState()
+                val state by SenderStateHolder.state.collectAsStateWithLifecycle()
+                val logs by AppLog.entries.collectAsStateWithLifecycle()
 
                 var permissionRefresh by remember { mutableIntStateOf(0) }
                 var pendingStart by remember { mutableStateOf(false) }
                 val permissionStatus = remember(permissionRefresh) { Permissions.status(this) }
+
+                // 設定画面から戻ったときなどに権限状態を再評価する。
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            permissionRefresh += 1
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),

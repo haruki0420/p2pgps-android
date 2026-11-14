@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0B57D0</color>
+    <!-- ブランド色は pine（DESIGN.md）。既定の青 tint は使わない。 -->
+    <color name="ic_launcher_background">#1E6B5A</color>
 </resources>

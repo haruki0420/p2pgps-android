@@ -37,10 +37,9 @@ LocationManager ──► LocationProvider ──► LocationFilter ──► Gp
 
 ## スレッドモデル
 
-- BLE コールバックは Binder スレッド。
-- `GattServerManager` の状態は `MutableStateFlow` で公開（スレッドセーフ）。
+- BLE コールバックは Binder スレッド。購読者集合・接続中デバイス集合・最後に送った値は `synchronized(lock)` で保護し、notify はロック内でスナップショットを取ってロック外で送信。
 - サービスは `Dispatchers.Main.immediate` の `CoroutineScope` で Control コマンド適用・送信ループ・状態公開を直列化。
-- 画面は `StateFlow` を `collectAsState()` で購読するだけ。
+- 画面は `StateFlow` を `collectAsStateWithLifecycle()` で購読するだけ。
 
 ## 前景サービス
 
@@ -53,12 +52,18 @@ LocationManager ──► LocationProvider ──► LocationFilter ──► Gp
 
 - サービス: P2P GPS Service + Device Information Service（任意）。
 - characteristic: Location / Control / Status / Extended。read は最後に送った値、notify は CCCD 購読中のみ。
-- アドバタイズ: Service UUID をメイン、ローカルネームを Scan Response に配置。
-- 端末名: Android の API 制約により、送信中だけ `BluetoothAdapter.setName("P2PGPS-ANDROID-XXXX")` を適用し、停止時に元へ戻す。
+- アドバタイズ: Service UUID をメイン、ローカルネームを Scan Response に配置。開始失敗時は端末名を復元して再試行可能。
+- 端末名: Android の API 制約により、送信中だけ `BluetoothAdapter.setName("P2PGPS-ANDROID-XXXX")` を適用し、停止時に元へ戻す。変更前の名前は未保存のときだけ捕捉し、再試行で二重変更しない。
+
+## 位置
+
+- `LocationManager` の GPS + NETWORK を購読。FINE 権限が無いときは GPS を要求せず NETWORK のみ購読し、provider 単位で例外を処理する。
+- 送信開始には FINE 権限が必要。coarse のみの場合は画面に「正確な位置情報が必要です」と表示する。
 
 ## テスト
 
 - `protocol/` と `location/` は純 Kotlin のため JVM で検証（仕様 §10 のテストベクタ）。
-- BLE・前景サービス・UI は実機のみ。CI は `assembleDebug` と `testDebugUnitTest` を実行。
+- `p2pgps-protocol` の共有テストベクタ JSON を手動ミラーし、`ProtocolVectorTest` が読み込んで突き合わせる。
+- BLE・前景サービス・UI は実機のみ。CI は `testDebugUnitTest` / `assembleDebug` / `lintDebug` を実行。
 
 詳細はリポジトリの [`docs/architecture.md`](https://github.com/haruki0420/p2pgps-android/blob/main/docs/architecture.md) を参照してください。

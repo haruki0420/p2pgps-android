@@ -66,9 +66,6 @@
 | `latitude` | -90.0 〜 +90.0 | `-900_000_000` 〜 `+900_000_000` |
 | `longitude` | -180.0 〜 +180.0 | `-1_800_000_000` 〜 `+1_800_000_000` |
 
-> 仕様書 §3.3 の座標範囲は当初 10 倍小さい値（`±90_000_000` / `±180_000_000`）と誤記されていましたが、
-> 正本側で `±900_000_000` / `±1_800_000_000` に修正済みです。本実装も修正後の値に合わせています。
-
 ## 3. Extended Location Packet（8 bytes）
 
 | Offset | Size | Field | 型 |
@@ -98,7 +95,19 @@
 
 - 未知 opcode（`0x10` の AUTH 予約を含む）→ `ControlDecodeResult.Failure(UNKNOWN_OPCODE)`
 - 不正長 → `ControlDecodeResult.Failure(BAD_LENGTH)`
-- interval の補正: `0` → 1000、`< 100` → 100、`> 60000` → 60000
+- 書き込み `hex` は**生値**。送信側は仕様 §5.1 に従って正規化した値を使う（`normalized_interval_ms`）。
+
+### 4.1 `interval_ms` の正規化（仕様 §5.1）
+
+| 生値 | 正規化後 | 実装 |
+| ---: | ---: | :--- |
+| `0` | `1000` | `clampInterval(0)` |
+| `1`–`99` | `100`（下限クランプ） | `clampInterval(1..99)` |
+| `100`–`60000` | そのまま | `clampInterval(100..60000)` |
+| `60001`–`65535` | `60000`（上限クランプ） | `clampInterval(60001..65535)` |
+
+- Status の `interval_ms` は正規化後の値を通知します（仕様 §6）。
+- 共有テストベクタ `control.json` は `hex`（生値）と `normalized_interval_ms`（適用値）を別フィールドで持ちます。
 
 `RESET` は仕様どおり interval=1000 / extended=off / sequence=0 に戻します（ストリーミング状態は維持）。
 
@@ -120,7 +129,9 @@
 
 ## 6. テストベクタ（仕様 §10）
 
-`app/src/test/java/jp/haruki0420/p2pgps/protocol/ProtocolCodecTest.kt` に以下を実装しています。
+### 6.1 ハンドコードされたテスト
+
+`app/src/test/java/jp/haruki0420/p2pgps/protocol/ProtocolCodecTest.kt` が仕様 §10 のベクタを個別に検証します。
 
 | ベクタ | テスト |
 | :--- | :--- |
@@ -133,34 +144,30 @@
 | Extended（バッテリー・プロバイダ・コース） | `extendedPacket_*`, `encodeCourse_*`, `providerType_*` |
 | Control 各 opcode | `controlCommands_encode`, `controlCommands_decodeAllOpcodes`, `controlCommand_*` |
 | Status | `statusPacket_*`, `statusCodes_matchSpec` |
+| 座標の丸め | `encodeCoordinate_roundsHalfAwayFromZero` |
 
-### 仕様書 §3.2 のエンコード例について（重要）
+### 6.2 共有テストベクタとの突き合わせ
 
-仕様書 `docs/protocol-spec.md` §3.2 の例には、同じ行の 10 進値と hex が一致しない箇所があります。
+`p2pgps-protocol/tests/vectors/*.json` を `app/src/test/resources/vectors/` に**手動ミラー**し、
+`ProtocolVectorTest.kt` が全ベクタ（location 13 / extended 5 / status 5 / control 22 / sequences 5）を
+読み込んで encode / decode / validate を検証します。
 
-| フィールド | 仕様の 10 進値 | 仕様の hex をデコードした値 |
-| :--- | ---: | ---: |
-| `latitude` | 356812360 | 356809832 |
-| `longitude` | 1397671250 | 1397899762 |
-| `timestamp` | 1763136000 | 1763666944 |
+- ミラー元と同期方法は [`app/src/test/resources/vectors/README.md`](../app/src/test/resources/vectors/README.md) を参照。
+- CI では `p2pgps-protocol` を checkout しないため自動同期ではありません。正本が更新されたら手動でコピーし直します。
+- Control は `hex`（生値）と `normalized_interval_ms`（仕様 §5.1 の適用値）を突き合わせます。
 
-一方、`altitude_m` / `accuracy_m` / `speed_mps` / `flags` / `sequence` は一致しています。
-
-本実装とテストは **規範定義**（`latitude = 緯度 × 10^7`、`timestamp = Unix エポック秒`）に従い、東京駅の正しいバイト列を次のように扱います。
+東京駅の hex は仕様 §3.2 のエンコード例と一致します。
 
 ```text
 01 03 2A 00 48 86 44 15 52 C5 4E 53 03 00 05 00 00 52 17 69
 ```
-
-（仕様書の例は `... 68 7C 44 15 F2 41 52 53 ... 00 6C 1F 69`）
-
-この不一致は仕様書側の記載ミスと考えられるため、`p2pgps-protocol` の正本とテストベクタを更新する際に修正が必要です。本リポジトリの実装は規範定義を優先しています。
 
 ## 7. 仕様との対応で注意した点
 
 - **バイトオーダー**: すべてリトルエンディアン。`Bytes.kt` で明示的に組み立て、`ByteBuffer` の既定（ビッグエンディアン）には依存しません。
 - **符号付き整数**: 2 の補数。`putI32Le` / `putI16Le` は `ushr` と `and 0xFFFF` で下位ビットを落とさずに書き込みます。
 - **uint32 timestamp**: Kotlin の `Long` で保持し、0〜4294967295 の範囲を検証します。
+- **座標の丸め**: Python 参照実装の `ROUND_HALF_UP` に合わせ、.5 は 0 から遠ざかる方向へ丸めます（`encodeCoordinate`）。
 - **20 bytes 固定**: MTU 23 でもフラグメンテーション不要。read は offset 0 のみ対応し、それ以外は `GATT_INVALID_OFFSET` を返します。
 - **未送信時の read 値**: flags=0 / state=0 の「無効」値（仕様 §1.1）。
 - **アドバタイズ**: Service UUID を AdvertiseData、ローカルネームを Scan Response に載せます。

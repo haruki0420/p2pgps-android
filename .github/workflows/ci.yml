@@ -1,4 +1,4 @@
-name: CI（ビルド・単体テスト）
+name: CI（ビルド・単体テスト・lint）
 
 on:
   push:
@@ -46,12 +46,24 @@ jobs:
       - name: 単体テストとデバッグAPKのビルド
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
 
+      # lint は Error で失敗させる（権限・API レベルの取りこぼしを機械的に防ぐ）。
+      - name: lint
+        run: ./gradlew :app:lintDebug --no-daemon
+
       - name: 単体テスト結果を保存する
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: lint結果を保存する
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
 
       # 実機確認に使える APK を残す。

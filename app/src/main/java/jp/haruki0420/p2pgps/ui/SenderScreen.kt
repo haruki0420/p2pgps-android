@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +59,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -103,7 +107,8 @@ fun SenderScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .imePadding(),
         ) {
             StatusRail(state)
             Column(
@@ -124,12 +129,13 @@ fun SenderScreen(
 }
 
 // ---------------------------------------------------------------------------
-// Status rail
+// Status rail（LED + 状態テキスト + ローカルネーム）
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun StatusRail(state: SenderState) {
     val colors = P2PTheme.colors
+    val status = railStatus(state)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,12 +143,18 @@ private fun StatusRail(state: SenderState) {
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LedIndicator(state)
+        LedIndicator(status)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = status.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.ink,
+        )
         Spacer(Modifier.width(8.dp))
         Text(
             text = state.localName.ifBlank { "P2P GPS 送信" },
             style = P2PType.numeric,
-            color = colors.ink,
+            color = colors.inkSecondary,
         )
         Spacer(Modifier.weight(1f))
         Text(
@@ -154,45 +166,52 @@ private fun StatusRail(state: SenderState) {
     HorizontalDivider(color = colors.line, thickness = 1.dp)
 }
 
+private data class RailStatus(
+    val label: String,
+    val color: Color,
+    val outlined: Boolean,
+)
+
 @Composable
-private fun LedIndicator(state: SenderState) {
+private fun railStatus(state: SenderState): RailStatus {
     val colors = P2PTheme.colors
-    val description: String
-    val color: Color
-    val outlined: Boolean
-    when {
-        state.ble.lastError != null -> {
-            description = "エラー"
-            color = colors.danger
-            outlined = false
-        }
+    return when {
+        state.ble.lastError != null -> RailStatus(
+            label = "エラー",
+            color = colors.danger,
+            outlined = false,
+        )
 
-        state.ble.connectedCentrals > 0 -> {
-            description = "接続済み"
-            color = colors.pine
-            outlined = false
-        }
+        state.ble.connectedCentrals > 0 -> RailStatus(
+            label = "接続済み",
+            color = colors.pine,
+            outlined = false,
+        )
 
-        state.ble.advertising -> {
-            description = "接続待ち"
-            color = colors.amber
-            outlined = false
-        }
+        state.ble.advertising -> RailStatus(
+            label = "接続待ち",
+            color = colors.amber,
+            outlined = false,
+        )
 
-        else -> {
-            description = "未接続"
-            color = colors.inkSecondary
-            outlined = true
-        }
+        else -> RailStatus(
+            label = "未接続",
+            color = colors.inkSecondary,
+            outlined = true,
+        )
     }
+}
+
+@Composable
+private fun LedIndicator(status: RailStatus) {
     val base = Modifier
         .size(8.dp)
-        .semantics { contentDescription = description }
+        .semantics { contentDescription = status.label }
     Box(
-        modifier = if (outlined) {
-            base.border(1.dp, color, CircleShape)
+        modifier = if (status.outlined) {
+            base.border(1.dp, status.color, CircleShape)
         } else {
-            base.background(color, CircleShape)
+            base.background(status.color, CircleShape)
         },
     )
 }
@@ -213,8 +232,18 @@ private fun ReadoutPlate(state: SenderState, reduceMotion: Boolean) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        CoordinateRow(label = "緯度", value = fix?.latitude, reduceMotion = reduceMotion)
-        CoordinateRow(label = "経度", value = fix?.longitude, reduceMotion = reduceMotion)
+        CoordinateRow(
+            label = "緯度",
+            value = fix?.latitude,
+            description = latitudeDescription(fix?.latitude),
+            reduceMotion = reduceMotion,
+        )
+        CoordinateRow(
+            label = "経度",
+            value = fix?.longitude,
+            description = longitudeDescription(fix?.longitude),
+            reduceMotion = reduceMotion,
+        )
         HorizontalDivider(color = colors.line, thickness = 1.dp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -275,23 +304,49 @@ private fun ReadoutPlate(state: SenderState, reduceMotion: Boolean) {
 }
 
 @Composable
-private fun CoordinateRow(label: String, value: Double?, reduceMotion: Boolean) {
+private fun CoordinateRow(
+    label: String,
+    value: Double?,
+    description: String,
+    reduceMotion: Boolean,
+) {
     val colors = P2PTheme.colors
-    Row(verticalAlignment = Alignment.Bottom) {
+    // 文字サイズ設定が大きいときはラベルと値を縦に積む（横並びだとラベルが折り返す）。
+    val largeFont = LocalDensity.current.fontScale >= 1.3f
+    val content: @Composable () -> Unit = {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = colors.inkSecondary,
-            modifier = Modifier.width(40.dp),
         )
         CoordinateValue(value = value, reduceMotion = reduceMotion)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        if (largeFont) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { content() }
+        } else {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Box(modifier = Modifier.width(40.dp)) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.inkSecondary,
+                    )
+                }
+                CoordinateValue(value = value, reduceMotion = reduceMotion)
+            }
+        }
     }
 }
 
 @Composable
 private fun CoordinateValue(value: Double?, reduceMotion: Boolean) {
     val colors = P2PTheme.colors
-    val text = value?.let { String.format(Locale.US, "%.5f", it) } ?: "—"
+    val text = value?.let { String.format(Locale.US, "%.7f", it) } ?: "—"
     Crossfade(
         targetState = text,
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 120),
@@ -349,6 +404,18 @@ private fun FixQualityBars(state: SenderState) {
 private fun StateSection(state: SenderState) {
     val colors = P2PTheme.colors
     val streaming = state.effectiveStreaming
+    val stateLabel = when {
+        streaming -> "送信中"
+        !state.serviceRunning -> "停止中"
+        state.streaming -> "受信側の接続待ち"
+        else -> "待機中"
+    }
+    val stateDetail = when {
+        streaming -> "位置を ${state.intervalMs} ms 間隔で送信しています。"
+        !state.serviceRunning -> "送信を開始すると、iPad から接続できるようになります。"
+        state.streaming -> "iPad が接続して購読を開始すると送信が始まります。"
+        else -> "受信側から START されると送信を開始します。"
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -364,11 +431,7 @@ private fun StateSection(state: SenderState) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = when {
-                    streaming -> "送信中"
-                    state.streaming -> "受信側の接続待ち"
-                    else -> "停止中"
-                },
+                text = stateLabel,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = if (streaming) colors.pine else colors.ink,
@@ -381,11 +444,7 @@ private fun StateSection(state: SenderState) {
             )
         }
         Text(
-            text = when {
-                streaming -> "位置を ${state.intervalMs} ms 間隔で送信しています。"
-                state.streaming -> "iPad が接続して購読を開始すると送信が始まります。"
-                else -> "送信を開始すると、iPad から接続できるようになります。"
-            },
+            text = stateDetail,
             style = MaterialTheme.typography.bodySmall,
             color = colors.inkSecondary,
         )
@@ -547,14 +606,19 @@ private fun IntervalOption(
             .height(48.dp)
             .background(if (selected) colors.pine else colors.surface, shape)
             .border(1.dp, if (selected) colors.pine else colors.line, shape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             style = P2PType.numeric,
             color = when {
-                selected -> Color.White
+                selected -> MaterialTheme.colorScheme.onPrimary
                 enabled -> colors.ink
                 else -> colors.inkSecondary
             },
@@ -586,6 +650,13 @@ private fun PermissionSection(
         )
         PermissionRow("位置情報（正確）", permissions.fineLocation)
         PermissionRow("位置情報（おおよそ）", permissions.coarseLocation)
+        if (permissions.coarseOnly) {
+            Text(
+                text = "正確な位置情報が必要です。「位置情報（正確）」を許可してください。",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.danger,
+            )
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PermissionRow("Bluetooth アドバタイズ", permissions.bluetoothAdvertise)
             PermissionRow("Bluetooth 接続", permissions.bluetoothConnect)
@@ -852,7 +923,7 @@ private fun PrimaryActionBar(
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = colors.pine,
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
             interactionSource = interactionSource,
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -870,6 +941,25 @@ private fun PrimaryActionBar(
 // helpers
 // ---------------------------------------------------------------------------
 
+private fun latitudeDescription(value: Double?): String = when {
+    value == null -> "緯度 未取得"
+    value >= 0.0 -> "北緯 ${formatCoordinate(value)}"
+    else -> "南緯 ${formatCoordinate(-value)}"
+}
+
+private fun longitudeDescription(value: Double?): String = when {
+    value == null -> "経度 未取得"
+    value >= 0.0 -> "東経 ${formatCoordinate(value)}"
+    else -> "西経 ${formatCoordinate(-value)}"
+}
+
+private fun formatCoordinate(value: Double): String = String.format(Locale.US, "%.7f", value)
+
+/**
+ * Reduce Motion の設定（`ANIMATOR_DURATION_SCALE == 0`）を読む。
+ *
+ * 設定変更は画面再生成まで反映されない（既知の制約。docs/design.md に記載）。
+ */
 @Composable
 private fun rememberReduceMotion(): Boolean {
     val context = LocalContext.current

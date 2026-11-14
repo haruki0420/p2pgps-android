@@ -1,4 +1,4 @@
-﻿package jp.haruki0420.p2pgps.ble
+package jp.haruki0420.p2pgps.ble
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -46,7 +46,9 @@ import kotlin.random.Random
  * BLE は実機なしでは検証できないため、このクラスはプロトコルの encode/decode を
  * [jp.haruki0420.p2pgps.protocol] に委譲し、状態管理だけを担当する。
  *
- * コールバックは Binder スレッドから呼ばれる。UI 状態は StateFlow 経由で公開する。
+ * スレッドモデル: GATT コールバックは Binder スレッド、notify は Main スレッドから呼ばれる。
+ * 購読者集合と最後に送った値は [lock] で保護し、notify はロック内でスナップショットを取って
+ * ロック外で送信する。公開状態は [MutableStateFlow] 経由でスレッドセーフに共有する。
  */
 @SuppressLint("MissingPermission")
 class GattServerManager(
@@ -66,14 +68,32 @@ class GattServerManager(
 
     val state: StateFlow<BleState> = _state.asStateFlow()
 
+    /** 購読者集合と最後に送った値を保護するロック。 */
+    private val lock = Any()
+
+    @Volatile
     private var gattServer: BluetoothGattServer? = null
+
+    @Volatile
     private var advertiser: BluetoothLeAdvertiser? = null
+
+    @Volatile
     private var advertiseCallback: AdvertiseCallback? = null
+
+    /** 端末名を変更する前の名前。未保存（null）のときだけ捕捉する。 */
+    @Volatile
     private var previousAdapterName: String? = null
+
+    @Volatile
     private var advertisedName: String = ""
 
+    @Volatile
     private var locationCharacteristic: BluetoothGattCharacteristic? = null
+
+    @Volatile
     private var statusCharacteristic: BluetoothGattCharacteristic? = null
+
+    @Volatile
     private var extendedCharacteristic: BluetoothGattCharacteristic? = null
 
     private val connectedDevices = linkedSetOf<BluetoothDevice>()
@@ -186,29 +206,34 @@ class GattServerManager(
                 // 無視する。
             }
         }
-        connectedDevices.clear()
-        locationSubscribers.clear()
-        statusSubscribers.clear()
-        extendedSubscribers.clear()
+        synchronized(lock) {
+            connectedDevices.clear()
+            locationSubscribers.clear()
+            statusSubscribers.clear()
+            extendedSubscribers.clear()
+        }
         _state.value = BleState()
     }
 
     /** Location Packet を保持し、購読中のセントラルへ notify する。 */
     fun notifyLocation(packet: LocationPacket) {
-        lastLocationBytes = packet.encode()
-        notifySubscribers(locationCharacteristic, locationSubscribers, lastLocationBytes)
+        val value = packet.encode()
+        synchronized(lock) { lastLocationBytes = value }
+        notifySubscribers(locationCharacteristic, locationSubscribers, value)
     }
 
     /** Status を保持し、購読中のセントラルへ notify する。 */
     fun notifyStatus(packet: StatusPacket) {
-        lastStatusBytes = packet.encode()
-        notifySubscribers(statusCharacteristic, statusSubscribers, lastStatusBytes)
+        val value = packet.encode()
+        synchronized(lock) { lastStatusBytes = value }
+        notifySubscribers(statusCharacteristic, statusSubscribers, value)
     }
 
     /** Extended Location を保持し、購読中のセントラルへ notify する。 */
     fun notifyExtended(packet: ExtendedPacket) {
-        lastExtendedBytes = packet.encode()
-        notifySubscribers(extendedCharacteristic, extendedSubscribers, lastExtendedBytes)
+        val value = packet.encode()
+        synchronized(lock) { lastExtendedBytes = value }
+        notifySubscribers(extendedCharacteristic, extendedSubscribers, value)
     }
 
     private fun requiredPermissions(): List<String> = buildList {
@@ -293,7 +318,7 @@ class GattServerManager(
         uuid: UUID,
         value: String,
     ): BluetoothGattCharacteristic {
-        staticValues[uuid] = value.toByteArray(Charsets.UTF_8)
+        synchronized(lock) { staticValues[uuid] = value.toByteArray(Charsets.UTF_8) }
         return BluetoothGattCharacteristic(
             uuid,
             BluetoothGattCharacteristic.PROPERTY_READ,
@@ -318,11 +343,16 @@ class GattServerManager(
         // 仕様 §1.2 のローカルネームを載せるため、端末名を一時的に変更する。
         // Android にはアドバタイズデータへ任意のローカルネームを入れる API が無く、
         // setIncludeDeviceName(true) は BluetoothAdapter の名前を参照するため。
-        advertisedName = buildLocalName()
-        previousAdapterName = try {
-            currentAdapter.name
-        } catch (e: SecurityException) {
-            null
+        if (advertisedName.isBlank()) {
+            advertisedName = buildLocalName()
+        }
+        // 変更前の名前は未保存のときだけ捕捉する。失敗して再試行しても二重変更しない。
+        if (previousAdapterName == null) {
+            previousAdapterName = try {
+                currentAdapter.name
+            } catch (e: SecurityException) {
+                null
+            }
         }
         try {
             currentAdapter.setName(advertisedName)
@@ -351,24 +381,33 @@ class GattServerManager(
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
+                if (advertiseCallback !== this) return
                 _state.update { it.copy(advertising = true, lastError = null) }
                 AppLog.i(TAG, "アドバタイズを開始しました: $advertisedName")
             }
 
             override fun onStartFailure(errorCode: Int) {
+                if (advertiseCallback !== this) return
                 _state.update {
                     it.copy(
                         advertising = false,
-                        lastError = "アドバタイズを開始できませんでした (code=$errorCode)",
+                        lastError = "アドバタイズを開始できませんでした。Bluetooth を OFF/ON してから再試行してください。",
                     )
                 }
                 AppLog.e(TAG, "アドバタイズの開始に失敗しました: code=$errorCode")
+                // 失敗したら状態を戻し、端末名も復元する。再試行時は元の名前から再捕捉する。
+                advertiser = null
+                advertiseCallback = null
+                restoreAdapterName()
             }
         }
         advertiseCallback = callback
         try {
             currentAdvertiser.startAdvertising(settings, advertiseData, scanResponse, callback)
         } catch (e: SecurityException) {
+            advertiser = null
+            advertiseCallback = null
+            restoreAdapterName()
             reportError("アドバタイズを開始できませんでした。Bluetooth を OFF/ON してから再試行してください。")
         }
     }
@@ -378,10 +417,11 @@ class GattServerManager(
         val previousName = previousAdapterName ?: return
         try {
             currentAdapter.setName(previousName)
+            previousAdapterName = null
         } catch (e: SecurityException) {
+            // 権限が無い場合は次の停止時に再試行する。
             AppLog.w(TAG, "端末名を元に戻せませんでした: ${e.message}")
         }
-        previousAdapterName = null
     }
 
     private fun buildLocalName(): String {
@@ -396,8 +436,12 @@ class GattServerManager(
         value: ByteArray,
     ) {
         val server = gattServer ?: return
-        if (characteristic == null || devices.isEmpty()) return
-        for (device in devices.toList()) {
+        if (characteristic == null) return
+        // ロック内でスナップショットを取り、送信はロック外で行う（Binder スレッドの
+        // add/remove と競合させない）。
+        val snapshot = synchronized(lock) { devices.toList() }
+        if (snapshot.isEmpty()) return
+        for (device in snapshot) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     server.notifyCharacteristicChanged(device, characteristic, false, value)
@@ -411,11 +455,13 @@ class GattServerManager(
         }
     }
 
-    private fun valueFor(uuid: UUID): ByteArray? = when (uuid) {
-        GattUuids.LOCATION -> lastLocationBytes
-        GattUuids.STATUS -> lastStatusBytes
-        GattUuids.EXTENDED -> lastExtendedBytes
-        else -> staticValues[uuid]
+    private fun valueFor(uuid: UUID): ByteArray? = synchronized(lock) {
+        when (uuid) {
+            GattUuids.LOCATION -> lastLocationBytes
+            GattUuids.STATUS -> lastStatusBytes
+            GattUuids.EXTENDED -> lastExtendedBytes
+            else -> staticValues[uuid]
+        }
     }
 
     private fun sendResponse(
@@ -433,12 +479,20 @@ class GattServerManager(
     }
 
     private fun updateConnectionState() {
-        _state.update {
-            it.copy(
+        val snapshot = synchronized(lock) {
+            ConnectionSnapshot(
                 connectedCentrals = connectedDevices.size,
                 locationSubscribed = locationSubscribers.isNotEmpty(),
                 statusSubscribed = statusSubscribers.isNotEmpty(),
                 extendedSubscribed = extendedSubscribers.isNotEmpty(),
+            )
+        }
+        _state.update {
+            it.copy(
+                connectedCentrals = snapshot.connectedCentrals,
+                locationSubscribed = snapshot.locationSubscribed,
+                statusSubscribed = snapshot.statusSubscribed,
+                extendedSubscribed = snapshot.extendedSubscribed,
             )
         }
     }
@@ -451,17 +505,26 @@ class GattServerManager(
     private val serverCallback = object : BluetoothGattServerCallback() {
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                // 133 などの GATT エラーを記録する（原因調査用）。
+                AppLog.w(TAG, "接続状態が変化しました: status=$status newState=$newState")
+            }
             when (newState) {
                 BluetoothGatt.STATE_CONNECTED -> {
-                    connectedDevices.add(device)
-                    AppLog.i(TAG, "セントラルが接続しました（接続数 ${connectedDevices.size}）")
+                    val count = synchronized(lock) {
+                        connectedDevices.add(device)
+                        connectedDevices.size
+                    }
+                    AppLog.i(TAG, "セントラルが接続しました（接続数 $count）")
                 }
 
                 BluetoothGatt.STATE_DISCONNECTED -> {
-                    connectedDevices.remove(device)
-                    locationSubscribers.remove(device)
-                    statusSubscribers.remove(device)
-                    extendedSubscribers.remove(device)
+                    synchronized(lock) {
+                        connectedDevices.remove(device)
+                        locationSubscribers.remove(device)
+                        statusSubscribers.remove(device)
+                        extendedSubscribers.remove(device)
+                    }
                     AppLog.i(TAG, "セントラルが切断しました")
                 }
             }
@@ -492,15 +555,17 @@ class GattServerManager(
                 return
             }
             val enabled = value != null && value.isNotEmpty() && (value[0].toInt() and 0x01) != 0
-            when (descriptor.characteristic?.uuid) {
-                GattUuids.LOCATION ->
-                    if (enabled) locationSubscribers.add(device) else locationSubscribers.remove(device)
+            synchronized(lock) {
+                when (descriptor.characteristic?.uuid) {
+                    GattUuids.LOCATION ->
+                        if (enabled) locationSubscribers.add(device) else locationSubscribers.remove(device)
 
-                GattUuids.STATUS ->
-                    if (enabled) statusSubscribers.add(device) else statusSubscribers.remove(device)
+                    GattUuids.STATUS ->
+                        if (enabled) statusSubscribers.add(device) else statusSubscribers.remove(device)
 
-                GattUuids.EXTENDED ->
-                    if (enabled) extendedSubscribers.add(device) else extendedSubscribers.remove(device)
+                    GattUuids.EXTENDED ->
+                        if (enabled) extendedSubscribers.add(device) else extendedSubscribers.remove(device)
+                }
             }
             if (responseNeeded) {
                 sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
@@ -521,6 +586,13 @@ class GattServerManager(
             if (characteristic.uuid != GattUuids.CONTROL || preparedWrite) {
                 if (responseNeeded) {
                     sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                }
+                return
+            }
+            // Control は 1〜3 bytes の単発書き込みのみ対応する。
+            if (offset != 0) {
+                if (responseNeeded) {
+                    sendResponse(device, requestId, BluetoothGatt.GATT_INVALID_OFFSET, offset, null)
                 }
                 return
             }
@@ -571,6 +643,13 @@ class GattServerManager(
             AppLog.i(TAG, "MTU を更新しました: $mtu")
         }
     }
+
+    private data class ConnectionSnapshot(
+        val connectedCentrals: Int,
+        val locationSubscribed: Boolean,
+        val statusSubscribed: Boolean,
+        val extendedSubscribed: Boolean,
+    )
 
     companion object {
         private const val TAG = "GattServer"

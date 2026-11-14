@@ -12,12 +12,10 @@ import org.junit.Test
  * 仕様 v1 §10 のテストベクタを JVM で検証する。
  *
  * 座標・タイムスタンプは仕様の規範定義（緯度経度 × 10^7、Unix エポック秒）から
- * 計算した値を期待値にしている。
+ * 計算した値を期待値にしている。東京駅の hex は仕様 §3.2 のエンコード例と一致する
+ * （`01032a004886441552c54e530300050000521769`）。
  *
- * 注意: 仕様書 §3.2 の「エンコード例（東京駅）」に載っている hex は、
- * 同じ行の 10 進値（lat=356812360 / lon=1397671250 / ts=1763136000）と一致しない
- * （例の hex をデコードすると lat=356809832 / lon=1397899762 / ts=1763666944 になる）。
- * 本実装とテストは規範定義に従う。詳細は docs/protocol.md を参照。
+ * 共有テストベクタ（JSON）との突き合わせは [ProtocolVectorTest] が行う。
  */
 class ProtocolCodecTest {
 
@@ -72,29 +70,32 @@ class ProtocolCodecTest {
 
     @Test
     fun antarctica_negativeCoordinatesAndAltitude() {
-        // 南極（南緯 77.8419 / 東経 166.6863 / 標高 -100m）。
+        // 南極（南緯 89.9999999 / 西経 179.9999999 / 標高 -2800m）。
+        // 共有テストベクタ location.json の `antarctic` と同じ値。
         val packet = LocationPacket(
-            flags = LocationPacket.FLAG_VALID_FIX or LocationPacket.FLAG_ALTITUDE_VALID,
-            sequence = 0,
-            latitude = LocationPacket.encodeCoordinate(-77.8419),
-            longitude = LocationPacket.encodeCoordinate(166.6863),
-            altitudeM = -100,
-            accuracyM = 12,
-            speedMps = LocationPacket.UNKNOWN_U8,
-            timestamp = 1_763_136_000L,
+            flags = LocationPacket.FLAG_VALID_FIX or
+                LocationPacket.FLAG_ALTITUDE_VALID or
+                LocationPacket.FLAG_SPEED_VALID,
+            sequence = 7,
+            latitude = LocationPacket.encodeCoordinate(-89.9999999),
+            longitude = LocationPacket.encodeCoordinate(-179.9999999),
+            altitudeM = -2_800,
+            accuracyM = 20,
+            speedMps = 1,
+            timestamp = 1_763_136_123L,
         )
 
-        assertEquals(-778_419_000, packet.latitude)
-        assertEquals(1_666_863_000, packet.longitude)
+        assertEquals(-899_999_999, packet.latitude)
+        assertEquals(-1_799_999_999, packet.longitude)
         assertEquals(
-            "01 03 00 00 C8 44 9A D1 98 4F 5A 63 9C FF 0C FF 00 52 17 69",
+            "01 07 07 00 01 17 5B CA 01 2E B6 94 10 F5 14 01 7B 52 17 69",
             packet.encode().toHexString(),
         )
 
         val decoded = LocationPacket.decode(packet.encode())
         assertNotNull(decoded)
-        assertEquals(-100, decoded!!.altitudeM)
-        assertFalse(decoded.hasSpeed)
+        assertEquals(-2_800, decoded!!.altitudeM)
+        assertTrue(decoded.hasSpeed)
         assertNull(decoded.validationError())
     }
 
@@ -293,6 +294,17 @@ class ProtocolCodecTest {
         assertEquals(35.6812360, LocationPacket.decodeCoordinate(356_812_360), 1e-9)
     }
 
+    @Test
+    fun encodeCoordinate_roundsHalfAwayFromZero() {
+        // Python 参照実装の ROUND_HALF_UP に合わせる（.5 は 0 から遠ざかる方向）。
+        assertEquals(1, LocationPacket.encodeCoordinate(0.00000005))
+        assertEquals(-1, LocationPacket.encodeCoordinate(-0.00000005))
+        assertEquals(2, LocationPacket.encodeCoordinate(0.00000015))
+        assertEquals(-2, LocationPacket.encodeCoordinate(-0.00000015))
+        assertEquals(1, LocationPacket.encodeCoordinate(0.00000006))
+        assertEquals(-1, LocationPacket.encodeCoordinate(-0.00000006))
+    }
+
     // ---------------------------------------------------------------------
     // Extended Location Packet（仕様 §4）
     // ---------------------------------------------------------------------
@@ -446,10 +458,16 @@ class ProtocolCodecTest {
 
     @Test
     fun controlCommand_intervalIsClamped() {
+        // 仕様 §5.1: 0→1000、1–99→100、100–60000→そのまま、60001–65535→60000。
         // 1ms → 100ms
         assertEquals(
             ControlCommand.Start(100),
             (ControlCommand.decode(byteArrayOf(0x01, 0x01, 0x00)) as ControlDecodeResult.Success).command,
+        )
+        // 50ms → 100ms
+        assertEquals(
+            ControlCommand.Start(100),
+            (ControlCommand.decode(byteArrayOf(0x01, 0x32, 0x00)) as ControlDecodeResult.Success).command,
         )
         // 65535ms → 60000ms
         assertEquals(
@@ -468,13 +486,16 @@ class ProtocolCodecTest {
     }
 
     @Test
-    fun clampInterval_matchesSpec() {
+    fun clampInterval_matchesSpec51() {
+        // 仕様 §5.1（lead 決定: 境界クランプ方式）。
         assertEquals(1_000, ControlCommand.clampInterval(0))
+        assertEquals(100, ControlCommand.clampInterval(1))
         assertEquals(100, ControlCommand.clampInterval(99))
         assertEquals(100, ControlCommand.clampInterval(100))
         assertEquals(1_000, ControlCommand.clampInterval(1_000))
         assertEquals(60_000, ControlCommand.clampInterval(60_000))
         assertEquals(60_000, ControlCommand.clampInterval(60_001))
+        assertEquals(60_000, ControlCommand.clampInterval(65_535))
     }
 
     // ---------------------------------------------------------------------

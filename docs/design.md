@@ -54,10 +54,10 @@
 
 ```text
 ┌──────────────────────────────────────────────┐
-│ ● P2PGPS-ANDROID-A1B2            1000 ms     │  status rail（52dp、下辺ヘアライン）
+│ ● 接続待ち P2PGPS-ANDROID-A1B2   1000 ms     │  status rail（52dp、下辺ヘアライン）
 ├──────────────────────────────────────────────┤
-│ 緯度  35.68124                               │  readout plate（surface、上角丸 16）
-│ 経度 139.76713                               │  座標は mono titleMedium
+│ 緯度  35.6812360                             │  readout plate（surface、上角丸 16）
+│ 経度 139.7671250                             │  座標は mono titleMedium（小数 7 桁）
 │ 精度 ±5 m                         ▂▄▆█ 高     │  精度 + fix 品質バー
 ├──────────────────────────────────────────────┤
 │ 送信中                              1000 ms   │  状態（titleLarge）+ 送信間隔（mono）
@@ -76,38 +76,39 @@
 └──────────────────────────────────────────────┘
 ```
 
-- 画面全体は `Scaffold(containerColor = paper)`。コンテンツは縦スクロール、主ボタンは `bottomBar` に固定。
+- 画面全体は `Scaffold(containerColor = paper)`。コンテンツは縦スクロール、主ボタンは `bottomBar` に固定。`imePadding()` でキーボード表示時も入力を隠さない。
 - リードアウトプレートのみ角丸（上端 16dp）。他はヘアラインと余白で構造化する。
-- 主ボタンは高さ 52dp・角丸 10dp・`pine` 塗り・白文字。押下で 0.98 スケール。
-- 送信レートの選択ボタンは高さ 48dp（タップ領域 44pt 以上を確保）。
+- 主ボタンは高さ 52dp・角丸 10dp・`pine` 塗り・文字色 `onPrimary`（Light は白、Dark は paper）。押下で 0.98 スケール。
+- 送信レートの選択ボタンは高さ 48dp（タップ領域 44pt 以上を確保）。選択状態は `selectable`（Role.RadioButton）で semantics に公開する。
 - セクション間は `HorizontalDivider(color = line, thickness = 1.dp)`。
 
 ## 5. コンポーネント
 
 | 名前 | 実装 |
 | :--- | :--- |
-| Status rail | 高さ 52dp。左に 8dp の LED + ローカルネーム（mono）、右に送信間隔（mono） |
-| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭。`semantics` で状態を読み上げ |
+| Status rail | 高さ 52dp。左に 8dp の LED + 状態テキスト（接続済み / 接続待ち / エラー / 未接続）+ ローカルネーム（mono）、右に送信間隔（mono） |
+| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭。状態は必ず隣のテキストでも示す（色だけに依存しない） |
 | Fix quality bars | 3×10dp のバー 4 本（`ink` / `line`）+ 「高/良/中/低/測位なし」テキスト |
-| Readout plate | `surface`、上角丸 16dp、内側 16dp パディング、座標は `P2PType.coordinate` |
-| Primary action | 高さ 52dp、角丸 10dp、`pine` 塗り / 白文字、押下 0.98 スケール |
-| Interval option | 高さ 48dp、角丸 10dp。選択時 `pine` 塗り + 白文字、非選択時 `surface` + `line` 枠 |
+| Readout plate | `surface`、上角丸 16dp、内側 16dp パディング、座標は `P2PType.coordinate`（小数 7 桁）。TalkBack は「北緯 …、東経 …」 |
+| Primary action | 高さ 52dp、角丸 10dp、`pine` 塗り / `onPrimary` 文字、押下 0.98 スケール |
+| Interval option | 高さ 48dp、角丸 10dp。選択時 `pine` 塗り + `onPrimary` 文字、非選択時 `surface` + `line` 枠 |
 | Log row | 時刻・レベル・メッセージをすべて monospace。レベルはテキスト（debug/info/warn/error）+ 色 |
 
 ## 6. モーション
 
 - fix 到着時: 座標数字の **120ms クロスフェード**のみ（`Crossfade` + `tween(120)`）。スライドインは使わない。
 - 主ボタン押下: 0.98 スケール（120ms）。
-- **Reduce Motion** を尊重: `Settings.Global.ANIMATOR_DURATION_SCALE == 0` のとき、クロスフェードは 0ms、押下スケールは無効。
-- LED のパルスは Sender 画面では使わない（接続待ちは静止表示）。
+- **Reduce Motion** を尊重: `Settings.Global.ANIMATOR_DURATION_SCALE == 0` のとき、クロスフェードは 0ms、押下スケールは無効。設定変更は画面再生成まで反映されない（既知の制約）。
+- LED のパルスは Sender 画面では使わない（root `DESIGN.md` の LED パルスは Receiver の接続中を指す。接続待ちは静止表示）。
 
 ## 7. コピー
 
 - 日本語。ボタンは動作を名指し: 「送信を開始」「送信を停止」「権限を許可する」「シミュレートを開始」「解除」「クリア」。
-- 状態: 「送信中」「受信側の接続待ち」「停止中」「接続 1 台」「購読 0 台」「±5 m」「1000 ms」。
+- 状態: 「送信中」「受信側の接続待ち」「待機中」「停止中」「接続 1 台」「購読 0 台」「±5 m」「1000 ms」。
 - エラーは 2 文（何が起きたか + どう直すか）。例:
   - 「Bluetooth が OFF です。端末の設定で Bluetooth を ON にしてから再試行してください。」
   - 「まだ測位できていません。屋外で待つか、デバッグのシミュレート位置を使用してください。」
+  - 「正確な位置情報が必要です。「位置情報（正確）」を許可してください。」
 - 感嘆符・絵文字・「〜しましょう」調のフィラーは使わない。
 
 ## 8. Anti-slop チェックリスト（自己点検結果）
@@ -120,12 +121,16 @@
 | ALL CAPS アイブロウ / `A · B · C` / `WORD — fragment` / `→` 付きボタン | 未使用 |
 | グラデーション・ガラス風ブラー・絵文字アイコン | 未使用。アイコンは Material Icons（outlined）のみ |
 | 01 / 02 / 03 の番号 | 未使用 |
-| 座標が主役（画面で最も大きい数字） | リードアウトプレートの座標が最大の数字（mono titleMedium、他は bodySmall） |
-| 状態が色だけで伝わっていない | LED + テキスト、アイコン + テキスト、品質バー + テキスト、レベル文字 + 色 |
+| 座標が主役（画面で最も大きい数字） | リードアウトプレートの座標（小数 7 桁）が最大の数字（mono titleMedium、他は bodySmall） |
+| 状態が色だけで伝わっていない | ステータスレールは LED + 状態テキスト、BLE / 権限はアイコン + テキスト、品質バー + テキスト、ログはレベル文字 + 色 |
 | タップ領域 44×44pt 以上 | 主ボタン 52dp、選択ボタン 48dp、権限ボタン 48dp |
-| Dynamic Type / Reduce Motion | システムフォントスケールに追従。Reduce Motion でクロスフェード 0ms・押下スケール無効 |
+| Dynamic Type / Reduce Motion | システムフォントスケールに追従（大きいときは座標ラベルを縦積み）。Reduce Motion でクロスフェード 0ms・押下スケール無効 |
+| ダークテーマのコントラスト | 主ボタン・選択ボタンの文字色に `onPrimary` を使用（白固定をやめ、ダークは paper `#0F1A1E`） |
+| IME インセット | `imePadding()` でキーボード表示時もデバッグ入力を隠さない |
 
 ## 9. 既知の割り切り
 
 - DESIGN.md の座標タイポは Android では `titleMedium`（16sp）。画面内で最大の数字にはなるが、端末の文字サイズ設定によっては相対的に小さく見える。Dynamic Type 追従を優先した。
-- レンダリング検証は実機が無いため未実施（CI はコンパイルのみ）。実機確認時に余白・タップ領域・ダーク配色を再確認する。
+- 座標表示は小数 7 桁（約 1 cm）。ログには座標を流さない（`AppLog` の方針）。
+- Reduce Motion の設定変更は画面再生成まで反映されない（`remember` で初回のみ評価）。
+- レンダリング検証は実機が無いため未実施（CI はコンパイル + lint のみ）。実機確認時に余白・タップ領域・ダーク配色を再確認する。

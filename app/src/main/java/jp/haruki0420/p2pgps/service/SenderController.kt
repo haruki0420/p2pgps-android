@@ -22,7 +22,9 @@ object SenderController {
 
     /** 送信を停止する（前景サービスを終了）。 */
     fun stop(context: Context) {
-        context.startService(intent(context, GpsSenderService.ACTION_STOP))
+        // サービス未起動時に startService すると一瞬前景サービスが起動してしまうため、
+        // stopService で直接停止する（後始末はサービスの onDestroy で行う）。
+        context.stopService(Intent(context, GpsSenderService::class.java))
     }
 
     /** 送信間隔を変更する（100〜60000ms に補正される）。 */

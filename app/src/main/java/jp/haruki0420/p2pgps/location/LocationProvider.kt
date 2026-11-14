@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -26,14 +27,16 @@ class LocationProvider(private val context: Context) {
         context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
 
     /** 位置情報の権限（FINE または COARSE）があるか。 */
-    fun hasPermission(): Boolean = ContextCompat.checkSelfPermission(
+    fun hasPermission(): Boolean = hasFinePermission() || ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+
+    /** 正確な位置情報（FINE）の権限があるか。 */
+    fun hasFinePermission(): Boolean = ContextCompat.checkSelfPermission(
         context,
         Manifest.permission.ACCESS_FINE_LOCATION,
-    ) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
+    ) == PackageManager.PERMISSION_GRANTED
 
     /** GPS / NETWORK のどちらかが有効か。 */
     fun isLocationEnabled(): Boolean {
@@ -51,12 +54,25 @@ class LocationProvider(private val context: Context) {
         if (!hasPermission()) return null
         val manager = locationManager ?: return null
         return try {
-            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-                .mapNotNull { provider -> manager.getLastKnownLocation(provider)?.toGpsFix() }
-                .maxByOrNull { it.timestampMillis }
+            providers().mapNotNull { provider ->
+                manager.getLastKnownLocation(provider)?.toGpsFix()
+            }.maxByOrNull { it.timestampMillis }
         } catch (e: SecurityException) {
             null
         }
+    }
+
+    /**
+     * 購読する provider の一覧。
+     *
+     * FINE 権限が無い場合は GPS_PROVIDER を要求しない（coarse のみの付与で
+     * SecurityException になり、NETWORK まで購読できなくなるのを避ける）。
+     */
+    private fun providers(): List<String> = buildList {
+        if (hasFinePermission()) {
+            add(LocationManager.GPS_PROVIDER)
+        }
+        add(LocationManager.NETWORK_PROVIDER)
     }
 
     /**
@@ -90,23 +106,23 @@ class LocationProvider(private val context: Context) {
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
         }
 
-        try {
-            for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
-                if (manager.isProviderEnabled(provider)) {
-                    manager.requestLocationUpdates(
-                        provider,
-                        minTimeMs,
-                        minDistanceM,
-                        listener,
-                        Looper.getMainLooper(),
-                    )
-                }
+        // provider 単位で要求する。1 つが SecurityException でも他方は購読を続ける。
+        for (provider in providers()) {
+            if (!manager.isProviderEnabled(provider)) continue
+            try {
+                manager.requestLocationUpdates(
+                    provider,
+                    minTimeMs,
+                    minDistanceM,
+                    listener,
+                    Looper.getMainLooper(),
+                )
+            } catch (e: SecurityException) {
+                Log.w(TAG, "位置更新を要求できませんでした: provider=$provider", e)
+            } catch (e: IllegalArgumentException) {
+                // 端末に存在しない provider は無視する。
+                Log.w(TAG, "存在しない provider です: $provider")
             }
-        } catch (e: SecurityException) {
-            close(e)
-            return@callbackFlow
-        } catch (e: IllegalArgumentException) {
-            // 端末に存在しない provider は無視する。
         }
 
         awaitClose {
@@ -138,4 +154,8 @@ class LocationProvider(private val context: Context) {
             @Suppress("DEPRECATION")
             isFromMockProvider
         }
+
+    companion object {
+        private const val TAG = "LocationProvider"
+    }
 }

@@ -23,8 +23,8 @@ iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) 
 
 | セクション | 内容 |
 | :--- | :--- |
-| ステータスレール | 接続 LED、ローカルネーム（mono）、送信間隔（mono） |
-| リードアウトプレート | 緯度・経度（mono、小数 5 桁）、精度、fix 品質バー（高/良/中/低/測位なし）、標高・速度、シミュレート表示 |
+| ステータスレール | 接続 LED と状態テキスト（接続済み / 接続待ち / エラー / 未接続）、ローカルネーム（mono）、送信間隔（mono） |
+| リードアウトプレート | 緯度・経度（mono、小数 7 桁）、精度、fix 品質バー（高/良/中/低/測位なし）、標高・速度、シミュレート表示 |
 | 状態 | 「送信中」「受信側の接続待ち」「停止中」、送信間隔、BLE の 3 状態（アドバタイズ中 / 接続 N 台 / 購読 N 台） |
 | 送信レート | 200 / 500 / 1000 / 2000 / 5000 ms の選択（受信側からの変更も反映） |
 | 権限 | 位置情報・Bluetooth・通知の付与状態（アイコン + テキスト）と一括要求 |
@@ -70,7 +70,7 @@ iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) 
 
 生成物: `app/build/outputs/apk/debug/app-debug.apk`
 
-CI（GitHub Actions）は Ubuntu + JDK 21 + Gradle で `:app:testDebugUnitTest` と `:app:assembleDebug` を実行し、APK を artifact として保存します。ワークフローは [`.github/workflows/ci.yml`](.github/workflows/ci.yml) を参照してください。
+CI（GitHub Actions）は Ubuntu + JDK 21 + Gradle で `:app:testDebugUnitTest` / `:app:assembleDebug` / `:app:lintDebug` を実行し、APK と lint レポートを artifact として保存します。ワークフローは [`.github/workflows/ci.yml`](.github/workflows/ci.yml) を参照してください。
 
 <details>
 <summary>コマンドライン環境での Android SDK セットアップ例（Linux）</summary>
@@ -86,10 +86,10 @@ sdkmanager "platform-tools" "platforms;android-36" "build-tools;37.0.0"
 ## 使い方
 
 1. iPad 側で `p2pgps-ios` の Receiver モードを起動し、スキャンを開始します。
-2. Android で本アプリを起動し、権限（位置情報・Bluetooth・通知）を許可します。
-3. 「位置情報を送信」を ON にします。BLE アドバタイズが始まり、`P2PGPS-ANDROID-XXXX` として iPad から見えます。
-4. iPad から接続すると、Status を read → `START(1000)` が書き込まれ、位置の notify が始まります。
-5. 停止するときは画面のスイッチを OFF にするか、通知の「停止」を押します。
+2. Android で本アプリを起動し、権限（位置情報・Bluetooth・通知）を許可します。位置情報は「正確な位置情報」（FINE）が必要です。
+3. 「送信を開始」ボタンを押します。BLE アドバタイズが始まり、`P2PGPS-ANDROID-XXXX` として iPad から見えます。ステータスレールの状態テキストが「接続待ち」になります。
+4. iPad から接続すると、Status を read → `START(1000)` が書き込まれ、位置の notify が始まります。状態テキストが「送信中」になります。
+5. 停止するときは画面下部の「送信を停止」ボタンか、通知の「停止」を押します。
 
 > 実機での動作確認手順は [`docs/testing.md`](docs/testing.md) と Wiki の [Troubleshooting](wiki/Troubleshooting.md) を参照してください。
 
@@ -97,17 +97,18 @@ sdkmanager "platform-tools" "platforms;android-36" "build-tools;37.0.0"
 
 | 権限 | 用途 | 必要な Android |
 | :--- | :--- | :--- |
-| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | 位置情報の取得 | すべて |
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | 位置情報の取得（送信開始には FINE が必要） | すべて |
 | `BLUETOOTH` / `BLUETOOTH_ADMIN` | BLE ペリフェラル | 〜 Android 11（`maxSdkVersion=30`） |
 | `BLUETOOTH_ADVERTISE` | アドバタイズ | Android 12 (API 31) 以降（実行時） |
 | `BLUETOOTH_CONNECT` | GATT サーバー・端末名 | Android 12 (API 31) 以降（実行時） |
-| `BLUETOOTH_SCAN` | 宣言のみ（本アプリはスキャンしない） | Android 12 (API 31) 以降 |
 | `FOREGROUND_SERVICE` | 前景サービス | Android 9 (API 28) 以降 |
 | `FOREGROUND_SERVICE_CONNECTED_DEVICE` | BLE 接続維持の前景サービス | Android 14 (API 34) 以降 |
 | `FOREGROUND_SERVICE_LOCATION` | 位置取得の前景サービス | Android 14 (API 34) 以降 |
 | `POST_NOTIFICATIONS` | 常駐通知 | Android 13 (API 33) 以降（実行時） |
 
+- 本アプリはスキャンしないため `BLUETOOTH_SCAN` は宣言しません（権限最小化）。
 - Android 12 以降では `BLUETOOTH_ADVERTISE` / `BLUETOOTH_CONNECT` の実行時許可が必要です。
+- 位置情報は「正確な位置情報」（FINE）が必要です。「おおよその位置情報」だけでは GPS を購読できず、NETWORK の fix も精度不足で送信できないため、画面にその旨を表示します。
 - Android 13 以降では通知の実行時許可が必要です（拒否しても送信自体は継続できます）。
 - 前景サービスタイプは `connectedDevice|location` を併用しています。Android 14 以降は位置取得を行う前景サービスに `location` タイプの宣言が求められるためです。
 
@@ -135,6 +136,7 @@ app/src/main/java/jp/haruki0420/p2pgps/
 ```
 
 - 仕様 §10 のテストベクタ（東京駅・南極・Null Island・範囲外・未知バージョン・sequence 巻き戻り・Extended・Control 各 opcode）を [`ProtocolCodecTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/protocol/ProtocolCodecTest.kt) で検証します。
+- `p2pgps-protocol` の共有テストベクタ JSON を `app/src/test/resources/vectors/` に手動ミラーし、[`ProtocolVectorTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/protocol/ProtocolVectorTest.kt) が全ベクタを読み込んで encode/decode/validate を突き合わせます（同期方法は [`vectors/README.md`](app/src/test/resources/vectors/README.md)）。
 - 位置フィルタは [`LocationFilterTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/location/LocationFilterTest.kt) で検証します。
 - BLE ペリフェラルと前景サービスは **実機でのみ** 検証可能です。手順は [`docs/testing.md`](docs/testing.md) を参照してください。
 
@@ -146,7 +148,7 @@ app/src/main/java/jp/haruki0420/p2pgps/
 - v1 は認証・暗号化を行いません。位置情報は端末外（クラウド）へ送信しませんが、近距離の第三者によるなりすましは防げません。
 - 位置情報のバックグラウンド取得は前景サービス経由で行います。省電力のため OS が位置更新を遅らせる場合があり、送信レートは厳密な周期ではありません。
 - 端末の Bluetooth 名の変更・位置情報の取得には、メーカー独自の省電力設定が影響する場合があります。
-- 仕様書 §3.2 のエンコード例（東京駅）の hex は、同じ行の 10 進値と一致しません。本実装は仕様の規範定義（緯度経度 × 10^7、Unix エポック秒）に従っています。詳細は [`docs/protocol.md`](docs/protocol.md) を参照してください。
+- Control の `interval_ms` は仕様 §5.1 に従い、0 は既定値 1000、1–99 は 100、100–60000 はそのまま、60001 以上は 60000 に正規化します。
 
 ## ライセンス
 

@@ -76,10 +76,10 @@
 
 ```text
 ┌──────────────────────────────────────────────┐
-│ ● P2PGPS-ANDROID-A1B2            1000 ms     │  status rail（52dp、下辺ヘアライン）
+│ ● 接続待ち P2PGPS-ANDROID-A1B2   1000 ms     │  status rail（52dp、下辺ヘアライン）
 ├──────────────────────────────────────────────┤
-│ 緯度  35.68124                               │  readout plate（surface、上角丸 16）
-│ 経度 139.76713                               │  座標は mono titleMedium
+│ 緯度  35.6812360                             │  readout plate（surface、上角丸 16）
+│ 経度 139.7671250                             │  座標は mono titleMedium（小数 7 桁）
 │ 精度 ±5 m                         ▂▄▆█ 高     │  精度 + fix 品質バー
 ├──────────────────────────────────────────────┤
 │ 送信中                              1000 ms   │  状態（titleLarge）+ 送信間隔（mono）
@@ -96,28 +96,29 @@
 └──────────────────────────────────────────────┘
 ```
 
-- 画面全体は `Scaffold(containerColor = paper)`。コンテンツは縦スクロール、主ボタンは `bottomBar` に固定。
+- 画面全体は `Scaffold(containerColor = paper)`。コンテンツは縦スクロール、主ボタンは `bottomBar` に固定。`imePadding()` でキーボード表示時も入力を隠さない。
 - リードアウトプレートのみ角丸（上端 16dp）。他はヘアラインと余白で構造化する。
-- 主ボタンは高さ 52dp・角丸 10dp・`pine` 塗り・白文字。押下で 0.98 スケール。
-- 送信レートの選択ボタンは高さ 48dp（タップ領域 44pt 以上）。
+- 主ボタンは高さ 52dp・角丸 10dp・`pine` 塗り・文字色 `onPrimary`（Light は白、Dark は paper）。押下で 0.98 スケール。
+- 送信レートの選択ボタンは高さ 48dp（タップ領域 44pt 以上）。選択状態は semantics に公開する。
 
 ## Components
 
 | 名前 | 仕様 |
 | :--- | :--- |
-| Status rail | 高さ 52dp。左に 8dp の LED + ローカルネーム（mono）、右に送信間隔（mono） |
-| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭 |
+| Status rail | 高さ 52dp。左に 8dp の LED + 状態テキスト（接続済み / 接続待ち / エラー / 未接続）+ ローカルネーム（mono）、右に送信間隔（mono） |
+| LED | 接続済み = `pine` 塗り、接続待ち = `amber` 塗り、エラー = `danger` 塗り、未接続 = `inkSecondary` の輪郭。状態は必ず隣のテキストでも示す |
 | Fix quality bars | 3×10dp のバー 4 本（`ink` / `line`）+ 「高/良/中/低/測位なし」テキスト |
-| Readout plate | `surface`、上角丸 16dp、内側 16dp パディング |
-| Primary action | 高さ 52dp、角丸 10dp、`pine` 塗り / 白文字、押下 0.98 スケール |
-| Interval option | 高さ 48dp、角丸 10dp。選択時 `pine` 塗り + 白文字、非選択時 `surface` + `line` 枠 |
+| Readout plate | `surface`、上角丸 16dp、内側 16dp パディング。座標は小数 7 桁、TalkBack は「北緯 …、東経 …」 |
+| Primary action | 高さ 52dp、角丸 10dp、`pine` 塗り / `onPrimary` 文字、押下 0.98 スケール |
+| Interval option | 高さ 48dp、角丸 10dp。選択時 `pine` 塗り + `onPrimary` 文字、非選択時 `surface` + `line` 枠 |
 | Log row | 時刻・レベル・メッセージをすべて monospace。レベルはテキスト + 色 |
 
 ## Motion
 
 - fix 到着時: 座標数字の **120ms クロスフェード**のみ（スライドイン禁止）。
 - 主ボタン押下: 0.98 スケール（120ms）。
-- Reduce Motion（`Settings.Global.ANIMATOR_DURATION_SCALE == 0`）時はすべて無効化。
+- Reduce Motion（`Settings.Global.ANIMATOR_DURATION_SCALE == 0`）時はすべて無効化。設定変更は画面再生成まで反映されない。
+- LED のパルスは Sender 画面では使わない（root `DESIGN.md` の LED パルスは Receiver の接続中を指す）。
 
 ## Copy
 

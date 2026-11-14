@@ -1,5 +1,8 @@
 # p2pgps-android
 
+[![CI](https://github.com/haruki0420/p2pgps-android/actions/workflows/ci.yml/badge.svg)](https://github.com/haruki0420/p2pgps-android/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) で iPad へ送り、iPad 上で「その位置にいる」ように位置情報を反映（シミュレート）するための **Android 送信側（Sender）アプリ**です。Kotlin + Jetpack Compose で実装しています。
 
 - 受信側（iPad）: [`p2pgps-ios`](https://github.com/haruki0420/p2pgps-ios) の Receiver モード
@@ -139,6 +142,13 @@ app/src/main/java/jp/haruki0420/p2pgps/
 - `p2pgps-protocol` の共有テストベクタ JSON を `app/src/test/resources/vectors/` に手動ミラーし、[`ProtocolVectorTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/protocol/ProtocolVectorTest.kt) が全ベクタを読み込んで encode/decode/validate を突き合わせます（同期方法は [`vectors/README.md`](app/src/test/resources/vectors/README.md)）。
 - 位置フィルタは [`LocationFilterTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/location/LocationFilterTest.kt) で検証します。
 - BLE ペリフェラルと前景サービスは **実機でのみ** 検証可能です。手順は [`docs/testing.md`](docs/testing.md) を参照してください。
+
+## Wiki
+
+`wiki/` に GitHub Wiki 用の Markdown を用意しています。GitHub の仕様で Wiki の初回ページだけは手動作成が必要です。
+
+1. https://github.com/haruki0420/p2pgps-android/wiki を開き「Create the first page」→ そのまま Save。
+2. `./scripts/publish-wiki.sh` を実行すると `wiki/*.md` が Wiki に同期されます。
 
 ## 既知の制約
 

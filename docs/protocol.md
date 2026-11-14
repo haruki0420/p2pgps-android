@@ -108,8 +108,9 @@
 
 - Status の `interval_ms` は正規化後の値を通知します（仕様 §6）。
 - 共有テストベクタ `control.json` は `hex`（生値）と `normalized_interval_ms`（適用値）を別フィールドで持ちます。
+- **Android 実装は `ControlCommand.decode()` の時点で正規化を適用した値**（`Start.intervalMs` / `SetInterval.intervalMs`）を返します。Python / iOS は生値を保持し、適用時に正規化します。挙動は同じですが API が返す値が異なる点に注意してください（生値は書き込みバイト列の offset 1 の uint16 LE）。
 
-`RESET` は仕様どおり interval=1000 / extended=off / sequence=0 に戻します（ストリーミング状態は維持）。
+`RESET` は既定設定（interval=1000 / extended=off / sequence=0）に戻しますが、**ストリーミング状態は変更しません**（仕様 §5）。停止したい場合は `STOP` を使用します。
 
 ## 5. Status characteristic（8 bytes）
 

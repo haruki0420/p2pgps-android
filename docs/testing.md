@@ -61,7 +61,7 @@ CI と同等の環境をローカルに構築して確認しました。
 | JDK | Temurin 21.0.13 |
 | Android SDK | Platform 36 / Build-Tools 37.0.0 |
 | Gradle | 9.8.2（Wrapper） |
-| `:app:testDebugUnitTest` | **53 tests / 0 failures**（ProtocolCodecTest 39、ProtocolVectorTest 5、LocationFilterTest 9） |
+| `:app:testDebugUnitTest` | **54 tests / 0 failures**（ProtocolCodecTest 40、ProtocolVectorTest 5、LocationFilterTest 9） |
 | `:app:assembleDebug` | 成功（`app-debug.apk` 約 18.65 MB） |
 | `:app:assembleRelease` | 成功（R8 による縮小。`app-release-unsigned.apk` 約 1.26 MB） |
 | `:app:lintDebug` | 成功（Error 0。警告 12: 依存バージョン更新・targetSdk 35 の方針・`allowBackup` 非推奨・`mipmap-anydpi-v26` の冗長 qualifier） |
@@ -115,7 +115,7 @@ CI と同等の環境をローカルに構築して確認しました。
 ### 4.5 表示・アクセシビリティ
 
 1. ダークテーマで主ボタン・送信レート選択ボタンの文字が読めることを確認する（`onPrimary` を使用）。
-2. 端末の文字サイズを最大にし、座標のラベルと値が崩れないことを確認する。
+2. 端末の文字サイズを最大にし、座標のラベルと値が崩れないことを確認する。`SenderScreen` には fontScale 1.0 / 1.3 / 2.0 の `@Preview` があり、Android Studio のプレビューでも確認できる。
 3. TalkBack で座標が「北緯 …、東経 …」と読み上げられることを確認する。
 4. Reduce Motion（アニメーション 0）で座標のクロスフェードと押下スケールが無効になることを確認する。
 5. ステータスレールの状態が色だけでなくテキストでも分かることを確認する。

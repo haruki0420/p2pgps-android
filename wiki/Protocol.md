@@ -41,7 +41,8 @@ BLE GATT プロトコル v1 の要点です。正本は [`p2pgps-protocol`](http
 | `0x05` | SET_EXTENDED | uint8 enabled |
 | `0x7F` | RESET | なし |
 
-- interval は仕様 §5.1 に従って正規化します（0→1000、1–99→100、100–60000→そのまま、60001–65535→60000）。Control の書き込み `hex` は生値で、Status の `interval_ms` は正規化後の値です。
+- interval は仕様 §5.1 に従って正規化します（0→1000、1–99→100、100–60000→そのまま、60001–65535→60000）。Control の書き込み `hex` は生値で、Status の `interval_ms` は正規化後の値です。Android は decode 時に正規化した値を返します。
+- `RESET` は既定設定（interval=1000 / extended=off / sequence=0）に戻しますが、ストリーミング状態は変更しません（停止は `STOP`）。
 - 未知 opcode は無視して `last_error = 1`、不正長は `last_error = 2`。
 
 ## Status（8 bytes）

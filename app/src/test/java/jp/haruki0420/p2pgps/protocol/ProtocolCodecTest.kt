@@ -379,7 +379,23 @@ class ProtocolCodecTest {
         assertEquals("04", ControlCommand.RequestFix.encode().toHexString())
         assertEquals("05 01", ControlCommand.SetExtended(true).encode().toHexString())
         assertEquals("05 00", ControlCommand.SetExtended(false).encode().toHexString())
+        // RESET は既定設定に戻すコマンド。payload を持たず、ストリーミング状態の変更は
+        // サービス側の責務（仕様 §5: RESET はストリーミング状態を変更しない）。
         assertEquals("7F", ControlCommand.Reset.encode().toHexString())
+    }
+
+    @Test
+    fun resetCommand_hasNoPayloadAndDoesNotChangeStreamingState() {
+        // 仕様 §5: RESET は既定設定（interval=1000 / extended=off / sequence=0）に戻すが、
+        // ストリーミング状態は変更しない。payload は opcode のみの 1 byte。
+        assertEquals(1, ControlCommand.Reset.encode().size)
+        val decoded = ControlCommand.decode(byteArrayOf(0x7F))
+        assertEquals(
+            ControlCommand.Reset,
+            (decoded as ControlDecodeResult.Success).command,
+        )
+        // ストリーミング状態の維持は GpsSenderService.applyControlCommand が担当する
+        // （JVM ではサービスを起動できないため、ここではコマンド表現のみ検証する）。
     }
 
     @Test

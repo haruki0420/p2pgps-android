@@ -106,7 +106,11 @@ sealed class ControlCommand {
          *
          * - 未知 opcode → [ControlDecodeResult.Failure]（[StatusError.UNKNOWN_OPCODE]）
          * - 不正長 → [ControlDecodeResult.Failure]（[StatusError.BAD_LENGTH]）
-         * - START / SET_INTERVAL の interval_ms は [clampInterval] で補正する
+         * - START / SET_INTERVAL の interval_ms は仕様 §5.1 に従い [clampInterval] で正規化する。
+         *
+         * 注意: Android 実装は **decode 時に正規化を適用した値**（[Start.intervalMs] /
+         * [SetInterval.intervalMs]）を返す。Python / iOS は生値を保持し、適用時に正規化する。
+         * 生値（受信側が書き込んだ uint16 LE）が必要な場合は書き込みバイト列の offset 1 を参照すること。
          */
         fun decode(bytes: ByteArray): ControlDecodeResult {
             if (bytes.isEmpty()) return ControlDecodeResult.Failure(StatusError.BAD_LENGTH)

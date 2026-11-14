@@ -77,6 +77,7 @@
 ```
 
 - 画面全体は `Scaffold(containerColor = paper)`。コンテンツは縦スクロール、主ボタンは `bottomBar` に固定。`imePadding()` でキーボード表示時も入力を隠さない。
+- ステータスレールは `heightIn(min = 52.dp)`。フォントスケール 1.3 以上では 2 段（状態 + 間隔 / ローカルネーム）に切り替え、各テキストは `maxLines = 1` + `TextOverflow.Ellipsis` で溢れを防ぐ。`SenderScreen` に fontScale 1.0 / 1.3 / 2.0 の `@Preview` を用意している。
 - リードアウトプレートのみ角丸（上端 16dp）。他はヘアラインと余白で構造化する。
 - 主ボタンは高さ 52dp・角丸 10dp・`pine` 塗り・文字色 `onPrimary`（Light は白、Dark は paper）。押下で 0.98 スケール。
 - 送信レートの選択ボタンは高さ 48dp（タップ領域 44pt 以上を確保）。選択状態は `selectable`（Role.RadioButton）で semantics に公開する。

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -66,10 +67,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import jp.haruki0420.p2pgps.ble.BleState
 import jp.haruki0420.p2pgps.core.LogEntry
 import jp.haruki0420.p2pgps.core.LogLevel
 import jp.haruki0420.p2pgps.core.SenderState
+import jp.haruki0420.p2pgps.location.GpsFix
+import jp.haruki0420.p2pgps.ui.theme.P2PGpsTheme
 import jp.haruki0420.p2pgps.ui.theme.P2PTheme
 import jp.haruki0420.p2pgps.ui.theme.P2PType
 import java.util.Locale
@@ -136,32 +142,75 @@ fun SenderScreen(
 private fun StatusRail(state: SenderState) {
     val colors = P2PTheme.colors
     val status = railStatus(state)
-    Row(
+    val localName = state.localName.ifBlank { "P2P GPS 送信" }
+    val intervalText = "${state.intervalMs} ms"
+    // 文字サイズ設定が大きいときは 2 段に分ける（横 1 行だと溢れるため）。
+    val largeFont = LocalDensity.current.fontScale >= 1.3f
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        LedIndicator(status)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = status.label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.ink,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = state.localName.ifBlank { "P2P GPS 送信" },
-            style = P2PType.numeric,
-            color = colors.inkSecondary,
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            text = "${state.intervalMs} ms",
-            style = P2PType.numeric,
-            color = colors.inkSecondary,
-        )
+        if (largeFont) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LedIndicator(status)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = intervalText,
+                    style = P2PType.numeric,
+                    color = colors.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = localName,
+                style = P2PType.numeric,
+                color = colors.inkSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LedIndicator(status)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = localName,
+                    style = P2PType.numeric,
+                    color = colors.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = intervalText,
+                    style = P2PType.numeric,
+                    color = colors.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
     HorizontalDivider(color = colors.line, thickness = 1.dp)
 }
@@ -973,5 +1022,77 @@ private fun rememberReduceMotion(): Boolean {
         } catch (e: Exception) {
             false
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews（フォントスケール 1.0 / 1.3 / 2.0 でのレイアウト確認用）
+// ---------------------------------------------------------------------------
+
+private fun previewSenderState(): SenderState = SenderState(
+    serviceRunning = true,
+    streaming = true,
+    ble = BleState(
+        advertising = true,
+        connectedCentrals = 1,
+        locationSubscribed = true,
+        statusSubscribed = true,
+        extendedSubscribed = false,
+        mtu = 23,
+    ),
+    localName = "P2PGPS-ANDROID-A1B2",
+    intervalMs = 1_000,
+    extendedEnabled = false,
+    sequence = 42,
+    simulated = false,
+    fixAvailable = true,
+    lastFix = GpsFix(
+        latitude = 35.6812360,
+        longitude = 139.7671250,
+        accuracyMeters = 5f,
+        provider = "gps",
+        timestampMillis = 1_763_136_000_000L,
+        altitudeMeters = 3.0,
+        speedMps = 0f,
+    ),
+    lastSentAtMillis = 1_763_136_000_000L,
+    sentPackets = 42,
+    batteryPct = 80,
+    charging = true,
+    lowBattery = false,
+)
+
+private fun previewPermissions(): PermissionStatus = PermissionStatus(
+    fineLocation = true,
+    coarseLocation = true,
+    bluetoothAdvertise = true,
+    bluetoothConnect = true,
+    notifications = true,
+)
+
+@Preview(name = "Sender fontScale 1.0", showBackground = true)
+@Preview(name = "Sender fontScale 1.3", fontScale = 1.3f, showBackground = true)
+@Preview(name = "Sender fontScale 2.0", fontScale = 2.0f, showBackground = true)
+@Composable
+private fun SenderScreenPreview() {
+    P2PGpsTheme {
+        SenderScreen(
+            state = previewSenderState(),
+            logs = listOf(
+                LogEntry(
+                    timestampMillis = 1_763_136_000_000L,
+                    level = LogLevel.INFO,
+                    tag = "GattServer",
+                    message = "アドバタイズを開始しました: P2PGPS-ANDROID-A1B2",
+                ),
+            ),
+            permissions = previewPermissions(),
+            onToggleSending = {},
+            onRequestPermissions = {},
+            onIntervalChange = {},
+            onSimulate = { _, _ -> },
+            onClearSimulation = {},
+            onClearLog = {},
+        )
     }
 }

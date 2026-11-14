@@ -106,7 +106,7 @@ app/src/main/java/jp/haruki0420/p2pgps/
 1. `onCreate` で通知チャンネル・GATT サーバー・位置プロバイダを初期化し、BLE 状態の購読と 10 秒ハートビートを開始。
 2. `onStartCommand` で必ず `ServiceCompat.startForeground()` を呼び、`connectedDevice|location` タイプで前景化。
 3. `START` で GATT サーバー開始・アドバタイズ開始・位置購読開始・送信ループ開始。
-4. Control コマンドに応じて状態遷移（`START` / `STOP` / `SET_INTERVAL` / `REQUEST_FIX` / `SET_EXTENDED` / `RESET`）。
+4. Control コマンドに応じて状態遷移（`START` / `STOP` / `SET_INTERVAL` / `REQUEST_FIX` / `SET_EXTENDED` / `RESET`）。`RESET` は既定設定（interval=1000 / extended=off / sequence=0）に戻しますが、ストリーミング状態は変更しません（仕様 §5）。
 5. 送信ループは `intervalMs` ごとに最新 fix から `LocationPacket` を組み立てて notify。Extended 有効時は `ExtendedPacket` も notify。Status は状態変化時と 10 秒ごとに notify。通知の更新は 2 秒に 1 回へ間引き、状態変化時は即時反映する。
 6. 購読者がいない間は送信をスキップし、Status を `Idle` として通知（仕様 §7）。
 7. `onDestroy` で送信ループ・位置購読・GATT サーバー・通知を解放。

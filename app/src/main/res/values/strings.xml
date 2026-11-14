@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">P2P GPS 送信</string>
+    <string name="notification_channel_name">位置情報の送信</string>
+    <string name="notification_channel_description">BLE で位置情報を送信している間の常駐通知です</string>
+    <string name="notification_stop">停止</string>
+</resources>

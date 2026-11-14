@@ -1,0 +1,7 @@
+# 改行コードを固定する。
+# gradlew は Linux の CI で実行するため LF を保証する。
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary

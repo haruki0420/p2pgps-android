@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アダプティブアイコンの前景（108dp キャンバス、中央 72dp が安全領域）。
+     青背景に白の位置ピンを置く。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 C67.3,28 78,38.7 78,52 C78,68 54,88 54,88 C54,88 30,68 30,52 C30,38.7 40.7,28 54,28 Z" />
+    <path
+        android:fillColor="#0B57D0"
+        android:pathData="M54,43 C60.6,43 66,48.4 66,55 C66,61.6 60.6,67 54,67 C47.4,67 42,61.6 42,55 C42,48.4 47.4,43 54,43 Z" />
+</vector>

@@ -1,0 +1,26 @@
+# ビルド成果物
+.gradle/
+build/
+gradle-*/
+gradle.zip
+*.apk
+*.aab
+*.idsig
+
+# 署名（環境ごとに異なる）
+*.jks
+*.keystore
+app/.debug-keystore/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+.DS_Store
+
+# ログ・一時ファイル
+*.log
+.tmp/
+# ローカル検証用ツール（JDK / Android SDK など）。コミットしない。
+.tmp-tools/

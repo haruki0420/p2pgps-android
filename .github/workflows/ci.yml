@@ -1,0 +1,64 @@
+name: CI（ビルド・単体テスト）
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ビルドと単体テスト
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: JDK 21 を用意する
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle を用意する
+        uses: gradle/actions/setup-gradle@v4
+
+      # SDK のライセンスへ同意し、必要なプラットフォームだけ入れる。
+      - name: Android SDK を用意する
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;37.0.0" "platform-tools" > /dev/null
+
+      # Windows でコミットした場合に実行ビットが落ちるのを防ぐ。
+      - name: Gradle Wrapper に実行権限を付ける
+        run: chmod +x ./gradlew
+
+      - name: 単体テストとデバッグAPKのビルド
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+
+      - name: 単体テスト結果を保存する
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      # 実機確認に使える APK を残す。
+      - name: デバッグAPKを保存する
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2pgps-android-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

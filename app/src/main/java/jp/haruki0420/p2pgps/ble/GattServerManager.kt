@@ -710,18 +710,11 @@ class GattServerManager(
             }
 
             // Some Android stacks leave descriptor.characteristic null. Fall
-            // back to the CCCD instances we created in addServices(), first by
-            // reference and then by the instance ID assigned by onServiceAdded.
+            // back to the CCCD instances we created in addServices().
             val characteristicUuid = descriptor.characteristic?.uuid ?: when {
                 descriptor === locationCccd -> GattUuids.LOCATION
                 descriptor === statusCccd -> GattUuids.STATUS
                 descriptor === extendedCccd -> GattUuids.EXTENDED
-                descriptor.instanceId != 0 && descriptor.instanceId == locationCccd?.instanceId ->
-                    GattUuids.LOCATION
-                descriptor.instanceId != 0 && descriptor.instanceId == statusCccd?.instanceId ->
-                    GattUuids.STATUS
-                descriptor.instanceId != 0 && descriptor.instanceId == extendedCccd?.instanceId ->
-                    GattUuids.EXTENDED
                 else -> null
             }
 
@@ -747,7 +740,7 @@ class GattServerManager(
                 AppLog.w(
                     TAG,
                     "CCCD 書き込みの対象を特定できませんでした。互換フォールバックで全購読を更新します: " +
-                        "descriptor=${descriptor.uuid} instanceId=${descriptor.instanceId}",
+                        "descriptor=${descriptor.uuid}",
                 )
                 synchronized(lock) {
                     if (enabled) {
@@ -810,12 +803,6 @@ class GattServerManager(
                 descriptor === locationCccd -> GattUuids.LOCATION
                 descriptor === statusCccd -> GattUuids.STATUS
                 descriptor === extendedCccd -> GattUuids.EXTENDED
-                descriptor.instanceId != 0 && descriptor.instanceId == locationCccd?.instanceId ->
-                    GattUuids.LOCATION
-                descriptor.instanceId != 0 && descriptor.instanceId == statusCccd?.instanceId ->
-                    GattUuids.STATUS
-                descriptor.instanceId != 0 && descriptor.instanceId == extendedCccd?.instanceId ->
-                    GattUuids.EXTENDED
                 else -> null
             }
             if (characteristicUuid == null) {

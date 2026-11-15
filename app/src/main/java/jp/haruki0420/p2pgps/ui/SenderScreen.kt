@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -909,7 +911,13 @@ private fun LogSection(logs: List<LogEntry>, onClearLog: () -> Unit) {
                 color = colors.inkSecondary,
             )
         } else {
-            LazyColumn(modifier = Modifier.height(200.dp)) {
+            val listState = rememberLazyListState()
+            LaunchedEffect(logs.size) {
+                if (logs.isNotEmpty()) {
+                    listState.animateScrollToItem(logs.lastIndex)
+                }
+            }
+            LazyColumn(state = listState, modifier = Modifier.height(240.dp)) {
                 items(logs) { entry ->
                     LogRow(entry)
                 }

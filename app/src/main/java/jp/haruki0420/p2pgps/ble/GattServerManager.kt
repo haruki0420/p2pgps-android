@@ -262,7 +262,7 @@ class GattServerManager(
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
         val locationCccdDescriptor = cccdDescriptor()
-        location.addDescriptor(locationCccdDescriptor)
+        val locationDescriptorAdded = location.addDescriptor(locationCccdDescriptor)
 
         val control = BluetoothGattCharacteristic(
             GattUuids.CONTROL,
@@ -277,7 +277,7 @@ class GattServerManager(
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
         val statusCccdDescriptor = cccdDescriptor()
-        status.addDescriptor(statusCccdDescriptor)
+        val statusDescriptorAdded = status.addDescriptor(statusCccdDescriptor)
 
         val extended = BluetoothGattCharacteristic(
             GattUuids.EXTENDED,
@@ -285,7 +285,7 @@ class GattServerManager(
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
         val extendedCccdDescriptor = cccdDescriptor()
-        extended.addDescriptor(extendedCccdDescriptor)
+        val extendedDescriptorAdded = extended.addDescriptor(extendedCccdDescriptor)
 
         service.addCharacteristic(location)
         service.addCharacteristic(control)
@@ -318,6 +318,13 @@ class GattServerManager(
             locationCccd = locationCccdDescriptor
             statusCccd = statusCccdDescriptor
             extendedCccd = extendedCccdDescriptor
+        }
+        AppLog.i(
+            TAG,
+            "CCCD descriptor 登録: location=$locationDescriptorAdded status=$statusDescriptorAdded extended=$extendedDescriptorAdded",
+        )
+        if (!locationDescriptorAdded || !statusDescriptorAdded || !extendedDescriptorAdded) {
+            reportError("CCCD ディスクリプタを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
         }
         return added
     }
@@ -561,6 +568,12 @@ class GattServerManager(
             offset: Int,
             value: ByteArray?,
         ) {
+            AppLog.i(
+                TAG,
+                "descriptor write request: uuid=${descriptor.uuid} " +
+                    "characteristic=${descriptor.characteristic?.uuid} " +
+                    "value=${value?.joinToString(" ") { "%02X".format(it) } ?: "null"}",
+            )
             if (descriptor.uuid != GattUuids.CCCD) {
                 if (responseNeeded) {
                     sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)

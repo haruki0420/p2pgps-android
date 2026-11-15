@@ -4,10 +4,12 @@ Android の現在地を Bluetooth で iPad に送るアプリです。
 
 ## 使い方
 
-1. APK をインストールする
+1. [Releases](https://github.com/haruki0420/p2pgps-android/releases) から APK をインストールする
 2. 位置情報・Bluetooth・通知を許可する
 3. 「送信を開始」を押す
 4. iPad 側で送信元を選ぶ
+
+iPad 側の準備は [Setup iPad](https://github.com/haruki0420/p2pgps/wiki/Setup-iPad) を見てください。
 
 ## ページ
 

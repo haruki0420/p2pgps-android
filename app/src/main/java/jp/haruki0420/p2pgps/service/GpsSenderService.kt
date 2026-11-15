@@ -164,7 +164,7 @@ class GpsSenderService : Service() {
                 } else {
                     AppLog.w(TAG, "シミュレート位置が不正です")
                     lastErrorMessage =
-                        "シミュレート位置が不正です。緯度は -90〜90、経度は -180〜180 の数値で入力してください。"
+                        "テスト用の位置が不正です。緯度は -90〜90、経度は -180〜180 の数値で入力してください。"
                     publishState(forceNotification = true)
                 }
             }
@@ -322,7 +322,7 @@ class GpsSenderService : Service() {
         if (fix == null) {
             setError(
                 StatusError.LOCATION_UNAVAILABLE,
-                "まだ測位できていません。屋外で待つか、デバッグのシミュレート位置を使用してください。",
+                "まだ測位できていません。屋外で待つか、テスト用の位置を使用してください。",
             )
             return
         }

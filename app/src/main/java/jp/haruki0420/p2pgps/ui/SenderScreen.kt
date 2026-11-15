@@ -552,12 +552,6 @@ private fun BleSection(state: SenderState) {
             active = state.ble.advertising,
         )
         BleRow(
-            icon = Icons.Outlined.Link,
-            label = "接続中",
-            value = "${state.ble.connectedCentrals} 台",
-            active = state.ble.connectedCentrals > 0,
-        )
-        BleRow(
             icon = Icons.Outlined.Notifications,
             label = "受信中の iPad",
             value = "${if (state.ble.locationSubscribed) 1 else 0} 台",

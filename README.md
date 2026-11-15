@@ -1,6 +1,5 @@
 # p2pgps-android
 
-[![CI](https://github.com/haruki0420/p2pgps-android/actions/workflows/ci.yml/badge.svg)](https://github.com/haruki0420/p2pgps-android/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) で iPad へ送り、iPad 上で「その位置にいる」ように位置情報を反映（シミュレート）するための **Android 送信側（Sender）アプリ**です。Kotlin + Jetpack Compose で実装しています。

@@ -1,0 +1,62 @@
+name: Release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.0.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APKs and attach to release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;37.0.0" "platform-tools" > /dev/null
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug and release APKs
+        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon
+
+      - name: Rename and checksum
+        run: |
+          DEBUG_APK="p2pgps-android-${{ inputs.tag }}-debug.apk"
+          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release-unsigned.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$DEBUG_APK"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RELEASE_APK"
+          sha256sum "$DEBUG_APK" "$RELEASE_APK" | tee checksums.sha256
+          ls -lh "$DEBUG_APK" "$RELEASE_APK"
+
+      - name: Upload APKs to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DEBUG_APK="p2pgps-android-${{ inputs.tag }}-debug.apk"
+          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release-unsigned.apk"
+          gh release upload "${{ inputs.tag }}" "$DEBUG_APK" "$RELEASE_APK" checksums.sha256 --clobber

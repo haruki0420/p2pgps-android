@@ -1,65 +1,42 @@
 # Getting Started
 
-## 1. ビルド
+## 1. インストール
+
+1. [Releases](https://github.com/haruki0420/p2pgps-android/releases) から `p2pgps-android-<version>-release.apk` をダウンロードします。
+2. Android 端末に転送してインストールします（提供元不明のアプリの許可が必要です）。
+3. 初回起動時に、位置情報（正確）・Bluetooth・通知を許可します。
+
+## 2. iPad 側の準備
+
+iPad に P2P GPS の受信アプリを入れ、Developer Mode・LocalDevVPN・pairing file・DDI を準備します。
+
+手順は [Setup iPad](https://github.com/haruki0420/p2pgps/wiki/Setup-iPad) を見てください。
+
+## 3. つなぐ
+
+1. 送信側の Android で「送信を開始」を押します。
+2. iPad で「スキャン開始」を押し、`P2PGPS-ANDROID-...` を選びます。
+3. iPad で「位置情報を反映」を ON にします。
+
+## 4. 停止する
+
+- 画面下部の「送信を停止」を押します。
+- または通知の「停止」を押します。
+
+## 5. ビルド（開発者向け）
 
 ```bash
 git clone https://github.com/haruki0420/p2pgps-android.git
 cd p2pgps-android
-
-# 単体テスト
-./gradlew :app:testDebugUnitTest
-
-# デバッグ APK
-./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-生成物は `app/build/outputs/apk/debug/app-debug.apk` です。
+必要な環境: JDK 21 / Android SDK Platform 36 / Build-Tools 37.0.0。
 
-### 必要な環境
+## 6. テスト用の固定位置
 
-| 項目 | 要件 |
-| :--- | :--- |
-| JDK | 21 |
-| Android SDK | Platform 36 / Build-Tools 37.0.0 |
-| Gradle | 9.8.2（Wrapper が自動取得） |
+「開発者向け（通常は使いません）」セクションに緯度・経度を入力し、「テスト用の位置を送る」を押します。「解除」で実測に戻ります。
 
-GitHub Actions でも同じビルドを実行できます。`.github/workflows/ci.yml` を参照してください。
+## うまくいかないとき
 
-## 2. インストール
-
-```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-または APK を端末へ転送してインストールします（提供元不明のアプリの許可が必要）。
-
-## 3. 権限の許可
-
-初回起動時に「権限を許可する」を押し、以下を許可します。
-
-- 位置情報（**正確な位置情報**が必要です。おおよその位置情報だけでは測位できません）
-- Bluetooth（Android 12 以降: アドバタイズ・接続）
-- 通知（Android 13 以降。拒否しても送信自体は可能）
-
-## 4. 送信を開始する
-
-1. iPad で P2P GPS Receiver を起動し、スキャンを開始します。
-2. Android で「送信を開始」ボタンを押します。
-3. ステータスレールに `P2PGPS-ANDROID-XXXX` が表示され、状態テキストが「接続待ち」になります。
-4. iPad から接続すると状態テキストが「接続済み」になり、送信が始まると「送信中」に変わります。
-5. 位置が取得できると、リードアウトプレートに緯度・経度・精度が表示されます。
-
-## 5. 停止する
-
-- 画面下部の「送信を停止」を押す
-- または通知の「停止」を押す
-
-停止するとアドバタイズも終了し、端末の Bluetooth 名は元に戻ります。
-
-## 6. デバッグ用のシミュレート位置
-
-実測値の代わりに固定座標を送りたい場合は「デバッグ」セクションに緯度・経度を入力し、「シミュレートを開始」を押します。`flags` の `SIMULATED` ビットが立ち、受信側でシミュレートとして扱えます。「解除」で実測に戻ります。
-
-## 7. 受信側（iPad）のセットアップ
-
-iPad 側の準備（Developer Mode / pairing file / LocalDevVPN / DDI）は `p2pgps-ios` の Wiki を参照してください。本アプリは BLE 送信のみを担当します。
+[困ったとき](Troubleshooting) を見てください。

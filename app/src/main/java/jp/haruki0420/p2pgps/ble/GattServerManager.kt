@@ -426,7 +426,7 @@ class GattServerManager(
         }
         if (!added) {
             AppLog.e(TAG, "GATT サービスの追加に失敗しました: ${next.uuid}")
-            reportError("GATT サービスを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
+            reportError("Bluetooth の準備に失敗しました。Bluetooth を OFF/ON して再試行してください。")
         }
         return added
     }

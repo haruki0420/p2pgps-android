@@ -3,6 +3,7 @@ package jp.haruki0420.p2pgps.ui
 import android.os.Build
 import android.provider.Settings
 import jp.haruki0420.p2pgps.BuildConfig
+import java.util.Locale
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -86,6 +87,13 @@ import kotlin.math.roundToInt
 /** 送信レートの選択肢（ms）。 */
 private val INTERVAL_OPTIONS = listOf(200, 500, 1_000, 2_000, 5_000)
 
+private fun formatInterval(ms: Int): String =
+    if (ms % 1000 == 0) {
+        "${ms / 1000} 秒"
+    } else {
+        String.format(Locale.US, "%.1f 秒", ms / 1000.0)
+    }
+
 /**
  * 送信側のメイン画面。
  *
@@ -146,7 +154,7 @@ private fun StatusRail(state: SenderState) {
     val colors = P2PTheme.colors
     val status = railStatus(state)
     val localName = state.localName.ifBlank { "P2P GPS 送信" }
-    val intervalText = "${state.intervalMs} ms"
+    val intervalText = formatInterval(state.intervalMs)
     // 文字サイズ設定が大きいときは 2 段に分ける（横 1 行だと溢れるため）。
     val largeFont = LocalDensity.current.fontScale >= 1.3f
     Column(
@@ -347,7 +355,7 @@ private fun ReadoutPlate(state: SenderState, reduceMotion: Boolean) {
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "シミュレート位置を送信中",
+                    text = "テスト用の位置を送信中",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.live,
                 )
@@ -465,7 +473,7 @@ private fun StateSection(state: SenderState) {
         else -> "待機中"
     }
     val stateDetail = when {
-        streaming -> "位置を ${state.intervalMs} ms 間隔で送信しています。"
+        streaming -> "位置を ${formatInterval(state.intervalMs)}ごとに送信しています。"
         !state.serviceRunning -> "送信を開始すると、iPad から接続できるようになります。"
         state.streaming -> "iPad が接続すると送信が始まります。"
         else -> "iPad から送信の指示が来ると開始します。"
@@ -492,7 +500,7 @@ private fun StateSection(state: SenderState) {
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = "${state.intervalMs} ms",
+                text = formatInterval(state.intervalMs),
                 style = P2PType.numeric,
                 color = colors.inkSecondary,
             )
@@ -546,8 +554,8 @@ private fun BleSection(state: SenderState) {
         )
         BleRow(
             icon = Icons.Outlined.Link,
-            label = "接続",
-            value = "接続 ${state.ble.connectedCentrals} 台",
+            label = "接続中",
+            value = "${state.ble.connectedCentrals} 台",
             active = state.ble.connectedCentrals > 0,
         )
         BleRow(
@@ -623,14 +631,7 @@ private fun IntervalSection(state: SenderState, onIntervalChange: (Int) -> Unit)
         ) {
             INTERVAL_OPTIONS.forEach { option ->
                 IntervalOption(
-                    label = when (option) {
-                        200 -> "0.2 秒"
-                        500 -> "0.5 秒"
-                        1000 -> "1 秒"
-                        2000 -> "2 秒"
-                        5000 -> "5 秒"
-                        else -> "${option} ms"
-                    },
+                    label = formatInterval(option),
                     selected = state.intervalMs == option,
                     enabled = state.serviceRunning,
                     onClick = { onIntervalChange(option) },
@@ -714,7 +715,7 @@ private fun PermissionSection(
             )
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PermissionRow("Bluetooth アドバタイズ", permissions.bluetoothAdvertise)
+            PermissionRow("Bluetooth で見つけられる権限", permissions.bluetoothAdvertise)
             PermissionRow("Bluetooth 接続", permissions.bluetoothConnect)
         } else {
             Text(
@@ -835,7 +836,7 @@ private fun DebugSection(
                     .height(48.dp),
                 shape = RoundedCornerShape(10.dp),
             ) {
-                Text("シミュレートを開始")
+                Text("テスト用の位置を送る")
             }
             OutlinedButton(
                 onClick = onClearSimulation,

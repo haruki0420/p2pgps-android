@@ -3,7 +3,17 @@ name: CI（ビルド・単体テスト・lint）
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "wiki/**"
+      - "LICENSE"
+      - "NOTICE"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "wiki/**"
+      - "LICENSE"
+      - "NOTICE"
 
 permissions:
   contents: read
@@ -43,12 +53,8 @@ jobs:
       - name: Gradle Wrapper に実行権限を付ける
         run: chmod +x ./gradlew
 
-      - name: 単体テストとデバッグAPKのビルド
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
-
-      # lint は Error で失敗させる（権限・API レベルの取りこぼしを機械的に防ぐ）。
-      - name: lint
-        run: ./gradlew :app:lintDebug --no-daemon
+      - name: 単体テスト・デバッグAPK・lint
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --no-daemon
 
       - name: 単体テスト結果を保存する
         if: always()

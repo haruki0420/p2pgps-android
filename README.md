@@ -170,3 +170,5 @@ GitHub Releases に以下を添付しています（`.github/workflows/release-a
 ## ライセンス
 
 [MIT License](LICENSE) © 2026 haruki0420
+
+サードパーティの帰属（Material Icons / Apache-2.0）は [NOTICE](NOTICE) と [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) に記載しています。

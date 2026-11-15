@@ -142,6 +142,14 @@ app/src/main/java/jp/haruki0420/p2pgps/
 - 位置フィルタは [`LocationFilterTest.kt`](app/src/test/java/jp/haruki0420/p2pgps/location/LocationFilterTest.kt) で検証します。
 - BLE ペリフェラルと前景サービスは **実機でのみ** 検証可能です。手順は [`docs/testing.md`](docs/testing.md) を参照してください。
 
+## リリース成果物
+
+GitHub Releases に以下を添付しています（`.github/workflows/release-apk.yml` で生成）。
+
+- `p2pgps-android-<tag>-debug.apk` — デバッグ署名済み APK（そのままインストール可能）
+- `p2pgps-android-<tag>-release-unsigned.apk` — リリースビルド（未署名。配布には署名が必要）
+- `checksums.sha256` — SHA-256 チェックサム
+
 ## Wiki
 
 `wiki/` に GitHub Wiki 用の Markdown を用意しています。GitHub の仕様で Wiki の初回ページだけは手動作成が必要です。

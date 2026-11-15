@@ -171,7 +171,7 @@ class GattServerManager(
         registerAdapterReceiver()
         val manager = bluetoothManager
         if (manager == null || adapter == null) {
-            reportError("この端末は Bluetooth LE に対応していません。BLE 対応の端末で実行してください。")
+            reportError("この端末は Bluetooth に対応していません。Bluetooth 対応の端末で実行してください。")
             return false
         }
         if (!isBluetoothEnabled()) {
@@ -182,11 +182,11 @@ class GattServerManager(
             val server = try {
                 manager.openGattServer(context, serverCallback)
             } catch (e: SecurityException) {
-                reportError("GATT サーバーを開けませんでした。Bluetooth を OFF/ON してから再試行してください。")
+                reportError("Bluetooth の接続を開始できませんでした。Bluetooth を OFF/ON してから再試行してください。")
                 return false
             }
             if (server == null) {
-                reportError("GATT サーバーを開けませんでした。Bluetooth を OFF/ON してから再試行してください。")
+                reportError("Bluetooth の接続を開始できませんでした。Bluetooth を OFF/ON してから再試行してください。")
                 return false
             }
             if (!addServices(server)) {
@@ -195,7 +195,7 @@ class GattServerManager(
                 } catch (e: SecurityException) {
                     // 解放できなくても致命的ではない。
                 }
-                reportError("GATT サービスを登録できませんでした。アプリを再起動してから再試行してください。")
+                reportError("Bluetooth の準備に失敗しました。アプリを再起動してから再試行してください。")
                 return false
             }
             gattServer = server
@@ -405,7 +405,7 @@ class GattServerManager(
             "CCCD descriptor 登録: location=$locationDescriptorAdded status=$statusDescriptorAdded extended=$extendedDescriptorAdded",
         )
         if (!locationDescriptorAdded || !statusDescriptorAdded || !extendedDescriptorAdded) {
-            reportError("CCCD ディスクリプタを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
+            reportError("Bluetooth の受信設定に失敗しました。Bluetooth を OFF/ON して再試行してください。")
         }
         return added
     }
@@ -457,7 +457,7 @@ class GattServerManager(
             null
         }
         if (currentAdvertiser == null) {
-            reportError("この端末は BLE アドバタイズに対応していません。BLE 対応の端末で実行してください。")
+            reportError("この端末は Bluetooth の送信に対応していません。Bluetooth 対応の端末で実行してください。")
             return
         }
         advertiser = currentAdvertiser
@@ -524,7 +524,7 @@ class GattServerManager(
                 _state.update {
                     it.copy(
                         advertising = false,
-                        lastError = "アドバタイズを開始できませんでした。Bluetooth を OFF/ON してから再試行してください。",
+                        lastError = "Bluetooth で見つけられる状態にできませんでした。Bluetooth を OFF/ON してから再試行してください。",
                     )
                 }
                 AppLog.e(TAG, "アドバタイズの開始に失敗しました: code=$errorCode")
@@ -541,7 +541,7 @@ class GattServerManager(
             advertiser = null
             advertiseCallback = null
             restoreAdapterName()
-            reportError("アドバタイズを開始できませんでした。Bluetooth を OFF/ON してから再試行してください。")
+            reportError("Bluetooth で見つけられる状態にできませんでした。Bluetooth を OFF/ON してから再試行してください。")
         }
     }
 
@@ -683,7 +683,7 @@ class GattServerManager(
                 addNextPendingService()
             } else {
                 AppLog.e(TAG, "GATT サービスの登録に失敗しました: status=$status")
-                reportError("GATT サービスの登録に失敗しました。Bluetooth を OFF/ON して再試行してください。")
+                reportError("Bluetooth の準備に失敗しました。Bluetooth を OFF/ON して再試行してください。")
             }
         }
 

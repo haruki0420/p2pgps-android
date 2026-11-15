@@ -87,6 +87,10 @@ class GpsSenderService : Service() {
 
         stateJob = scope.launch {
             gattServer.state.collect { ble ->
+                if (ble.connectedCentrals == 0 && streaming) {
+                    streaming = false
+                    AppLog.i(TAG, "セントラルが切断されたため待機状態に戻します")
+                }
                 SenderStateHolder.update { it.copy(ble = ble) }
                 notifyStatus()
                 publishState(forceNotification = true)

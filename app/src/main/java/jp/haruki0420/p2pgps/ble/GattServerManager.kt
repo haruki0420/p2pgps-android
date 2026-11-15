@@ -605,8 +605,20 @@ class GattServerManager(
             if (characteristicUuid == null) {
                 AppLog.w(
                     TAG,
-                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}",
+                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}。" +
+                        "全購読として扱います",
                 )
+                synchronized(lock) {
+                    if (enabled) {
+                        locationSubscribers.add(device)
+                        statusSubscribers.add(device)
+                        extendedSubscribers.add(device)
+                    } else {
+                        locationSubscribers.remove(device)
+                        statusSubscribers.remove(device)
+                        extendedSubscribers.remove(device)
+                    }
+                }
             }
 
             if (responseNeeded) {

@@ -93,12 +93,14 @@ class LocationProvider(private val context: Context) {
             return@callbackFlow
         }
 
+        var closed = false
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 trySend(location.toGpsFix())
             }
 
             override fun onProviderEnabled(provider: String) {
+                if (closed) return
                 if (provider !in providers()) return
                 // Re-request after the user turns GPS/network location back on;
                 // the original request did not cover a provider that was off.
@@ -143,6 +145,7 @@ class LocationProvider(private val context: Context) {
         }
 
         awaitClose {
+            closed = true
             try {
                 manager.removeUpdates(listener)
             } catch (e: SecurityException) {

@@ -78,17 +78,19 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;37.0.0" > /dev/null
 
-      - name: Download debug APK
+      - name: Download APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p apk
-          gh release download "${{ steps.tag.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern '*-debug.apk' \
-            --dir apk \
-            --clobber
+          TAG="${{ steps.tag.outputs.tag }}"
+          if ! gh release download "$TAG" --repo "${{ github.repository }}" \
+              --pattern '*-release.apk' --dir apk --clobber; then
+            echo "release APK not found; falling back to debug APK (legacy releases)" >&2
+            gh release download "$TAG" --repo "${{ github.repository }}" \
+              --pattern '*-debug.apk' --dir apk --clobber
+          fi
           ls -l apk
 
       - name: Verify APK version
@@ -105,7 +107,7 @@ jobs:
             v1.0.2) EXPECTED_CODE=3 ;;
           esac
 
-          APK=$(find apk -maxdepth 1 -name '*-debug.apk' | head -n 1)
+          APK=$(find apk -maxdepth 1 -name '*.apk' | head -n 1)
           AAPT="$ANDROID_HOME/build-tools/37.0.0/aapt"
           INFO=$("$AAPT" dump badging "$APK" | head -n 1)
           ACTUAL_NAME=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<< "$INFO")
@@ -121,5 +123,10 @@ jobs:
           if [ "$ACTUAL_CODE" != "$EXPECTED_CODE" ]; then
             echo "error: versionCode mismatch" >&2
             exit 1
+          fi
+
+          if [[ "$APK" == *-release.apk ]]; then
+            APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+            "$APKSIGNER" verify --print-certs "$APK"
           fi
           echo "OK: APK version matches $TAG"

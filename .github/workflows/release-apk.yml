@@ -41,7 +41,24 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build debug and release APKs
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "error: ANDROID_KEYSTORE_BASE64 secret is not set" >&2
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          chmod 600 "$RUNNER_TEMP/release.keystore"
+
+      - name: Build debug and signed release APKs
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           TAG="${{ inputs.tag }}"
@@ -53,12 +70,19 @@ jobs:
             -PappVersionName="$VERSION" \
             -PappVersionCode="$VERSION_CODE"
 
+      - name: Verify release APK signature
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
       - name: Rename and checksum
         run: |
+          set -euo pipefail
           DEBUG_APK="p2pgps-android-${{ inputs.tag }}-debug.apk"
-          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release-unsigned.apk"
+          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$DEBUG_APK"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RELEASE_APK"
+          cp app/build/outputs/apk/release/app-release.apk "$RELEASE_APK"
           sha256sum "$DEBUG_APK" "$RELEASE_APK" | tee checksums.sha256
           ls -lh "$DEBUG_APK" "$RELEASE_APK"
 
@@ -66,6 +90,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           DEBUG_APK="p2pgps-android-${{ inputs.tag }}-debug.apk"
-          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release-unsigned.apk"
+          RELEASE_APK="p2pgps-android-${{ inputs.tag }}-release.apk"
           gh release upload "${{ inputs.tag }}" "$DEBUG_APK" "$RELEASE_APK" checksums.sha256 --clobber

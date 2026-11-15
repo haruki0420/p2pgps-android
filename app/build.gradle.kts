@@ -10,6 +10,17 @@ plugins {
 val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.3"
 val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 10003
 
+// Release signing is configured from the environment in CI (GitHub Secrets).
+// Local builds without these variables produce an unsigned release APK.
+val releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    ?: providers.gradleProperty("androidKeystorePath").orNull
+val releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    ?: providers.gradleProperty("androidKeystorePassword").orNull
+val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    ?: providers.gradleProperty("androidKeyAlias").orNull
+val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    ?: providers.gradleProperty("androidKeyPassword").orNull
+
 android {
     namespace = "jp.haruki0420.p2pgps"
     compileSdk = 36
@@ -22,6 +33,21 @@ android {
         versionName = appVersionName
     }
 
+    signingConfigs {
+        if (releaseKeystorePath != null &&
+            releaseKeystorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                this.keyAlias = releaseKeyAlias
+                this.keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -30,6 +56,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
     compileOptions {

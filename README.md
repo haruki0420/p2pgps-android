@@ -20,12 +20,12 @@ iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) 
 
 | ファイル | 内容 | インストール |
 | :--- | :--- | :--- |
-| `*-debug.apk` | デバッグビルド。debug 鍵で署名済み。`android:debuggable=true`、サイズ大 | **可**（テスト用） |
-| `*-release-unsigned.apk` | リリースビルド（minify / shrink 済み）。**未署名** | **不可**（署名が必要） |
+| `*-release.apk` | リリースビルド。**固定のリリース鍵で署名済み**。更新インストール可 | **可（推奨）** |
+| `*-debug.apk` | デバッグビルド。debug 鍵で署名済み。`android:debuggable=true`、サイズ大 | 可（ログ確認用。更新には不向き） |
 
-- 既存アプリと署名が違う場合は `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（「既存のパッケージと競合」）になります。設定 → アプリ → P2P GPS → **アンインストール**後にインストールしてください。`adb uninstall jp.haruki0420.p2pgps` でも削除できます。
-- **CI の debug APK は実行ごとに debug 鍵が変わります**（GitHub Actions のランナーは毎回新しい環境のため）。そのため debug APK は**更新インストールに使えません**。継続的な更新にはリリース鍵での署名が必要です（F-Droid リポジトリも同様）。
-- `-release-unsigned.apk` は配布用ではなく、`apksigner` や F-Droid などで署名するための入力です。
+- リリース署名の詳細は [docs/release-signing.md](docs/release-signing.md) を参照してください。
+- 過去に debug 署名 APK をインストールしている場合、リリース署名 APK とは署名が違うため **初回だけアンインストール**が必要です（設定 → アプリ → P2P GPS → アンインストール、または `adb uninstall jp.haruki0420.p2pgps`）。
+- 以後は同じリリース鍵で署名されるため、versionCode が増えていれば**アンインストールなしで更新**できます。
 
 ## 主な機能
 

@@ -16,6 +16,17 @@ iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) 
 - `.github/workflows/verify-version.yml` が、APK の `versionName` / `versionCode` とタグの一致、UI へのハードコードがないことを検証します。
 - アプリ内の「アプリ情報」に `BuildConfig.VERSION_NAME` / `VERSION_CODE` を表示します。
 
+## APK の種類とインストール
+
+| ファイル | 内容 | インストール |
+| :--- | :--- | :--- |
+| `*-debug.apk` | デバッグビルド。debug 鍵で署名済み。`android:debuggable=true`、サイズ大 | **可**（テスト用） |
+| `*-release-unsigned.apk` | リリースビルド（minify / shrink 済み）。**未署名** | **不可**（署名が必要） |
+
+- 既存アプリと署名が違う場合は `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（「既存のパッケージと競合」）になります。設定 → アプリ → P2P GPS → **アンインストール**後にインストールしてください。`adb uninstall jp.haruki0420.p2pgps` でも削除できます。
+- **CI の debug APK は実行ごとに debug 鍵が変わります**（GitHub Actions のランナーは毎回新しい環境のため）。そのため debug APK は**更新インストールに使えません**。継続的な更新にはリリース鍵での署名が必要です（F-Droid リポジトリも同様）。
+- `-release-unsigned.apk` は配布用ではなく、`apksigner` や F-Droid などで署名するための入力です。
+
 ## 主な機能
 
 - **BLE ペリフェラル**: `BluetoothLeAdvertiser` + `BluetoothGattServer` による GATT サーバー。Service UUID `B1E5A000-9C3D-4E7A-8F20-1A2B3C4D5E6F` をアドバタイズし、ローカルネーム `P2PGPS-ANDROID-XXXX` を Scan Response に載せます。

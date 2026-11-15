@@ -890,7 +890,7 @@ private fun LogSection(logs: List<LogEntry>, onClearLog: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "ログ",
+                text = "動作記録（開発者向け）",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.ink,

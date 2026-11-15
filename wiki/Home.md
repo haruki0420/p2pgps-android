@@ -1,6 +1,6 @@
 # P2P GPS Android Sender
 
-Android の現在地を Bluetooth で iPad に送るアプリです。
+Android の現在地を Bluetooth で iPad に送るアプリです。アプリでは「送信する」を選びます。
 
 ## 使い方
 

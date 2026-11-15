@@ -1,0 +1,125 @@
+name: Verify version
+
+# Guards against the version-management bugs we hit:
+#   * v1.0.1 was tagged but built with versionName 1.0.0 / versionCode 1
+#   * a hard-coded version string in the UI
+#
+# Source check runs on every push; APK check runs after every "Release APK"
+# run and can be dispatched manually for a tag.
+
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["Release APK"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (empty = latest release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  source-check:
+    name: Source version configuration
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version configuration
+        run: |
+          set -euo pipefail
+          grep -q 'versionCode' app/build.gradle.kts
+          grep -q 'versionName' app/build.gradle.kts
+          grep -q 'BuildConfig.VERSION_NAME' app/src/main/java/jp/haruki0420/p2pgps/ui/SenderScreen.kt
+          if grep -rnE 'Text\("v?[0-9]+\.[0-9]+\.[0-9]+' app/src/main/java/; then
+            echo "error: hard-coded version string in UI" >&2
+            exit 1
+          fi
+          echo "OK: version is read from BuildConfig and build.gradle.kts"
+
+  apk-check:
+    name: APK version matches release tag
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName --jq '.[0].tagName')
+          fi
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "No release found." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $TAG"
+
+      - name: Set up Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;37.0.0" > /dev/null
+
+      - name: Download debug APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p apk
+          gh release download "${{ steps.tag.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*-debug.apk' \
+            --dir apk \
+            --clobber
+          ls -l apk
+
+      - name: Verify APK version
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          EXPECTED_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+
+          # Legacy releases predate tag-driven version stamping.
+          case "$TAG" in
+            v1.0.0|v1.0.1) EXPECTED_CODE=1 ;;
+            v1.0.2) EXPECTED_CODE=3 ;;
+          esac
+
+          APK=$(find apk -maxdepth 1 -name '*-debug.apk' | head -n 1)
+          AAPT="$ANDROID_HOME/build-tools/37.0.0/aapt"
+          INFO=$("$AAPT" dump badging "$APK" | head -n 1)
+          ACTUAL_NAME=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<< "$INFO")
+          ACTUAL_CODE=$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<< "$INFO")
+
+          echo "tag=$TAG expected=${VERSION} (${EXPECTED_CODE})"
+          echo "apk=${ACTUAL_NAME} (${ACTUAL_CODE})"
+
+          if [ "$ACTUAL_NAME" != "$VERSION" ]; then
+            echo "error: versionName mismatch" >&2
+            exit 1
+          fi
+          if [ "$ACTUAL_CODE" != "$EXPECTED_CODE" ]; then
+            echo "error: versionCode mismatch" >&2
+            exit 1
+          fi
+          echo "OK: APK version matches $TAG"

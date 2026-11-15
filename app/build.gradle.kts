@@ -4,6 +4,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release builds stamp versionName/versionCode from the git tag in CI
+// (`-PappVersionName=... -PappVersionCode=...`). The fallbacks are only for
+// local builds; keep them in sync with the latest release.
+val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.3"
+val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 10003
+
 android {
     namespace = "jp.haruki0420.p2pgps"
     compileSdk = 36
@@ -12,8 +18,8 @@ android {
         applicationId = "jp.haruki0420.p2pgps"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildTypes {

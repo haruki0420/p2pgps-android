@@ -9,6 +9,13 @@ iPhone / Android で取得した GPS 位置情報を BLE (Bluetooth Low Energy) 
 
 本リポジトリは **Android 送信側のみ** を提供します。Google Play Services（FusedLocationProvider）には依存せず、`LocationManager` と Android 標準の BLE API だけで動作します。
 
+## バージョン管理
+
+- `versionName` / `versionCode` は**リリースタグから CI が刻印**します（例: `v1.0.3` → `1.0.3` / `10003`）。
+- ローカルビルド用のフォールバック値は `app/build.gradle.kts` にあります。
+- `.github/workflows/verify-version.yml` が、APK の `versionName` / `versionCode` とタグの一致、UI へのハードコードがないことを検証します。
+- アプリ内の「アプリ情報」に `BuildConfig.VERSION_NAME` / `VERSION_CODE` を表示します。
+
 ## 主な機能
 
 - **BLE ペリフェラル**: `BluetoothLeAdvertiser` + `BluetoothGattServer` による GATT サーバー。Service UUID `B1E5A000-9C3D-4E7A-8F20-1A2B3C4D5E6F` をアドバタイズし、ローカルネーム `P2PGPS-ANDROID-XXXX` を Scan Response に載せます。

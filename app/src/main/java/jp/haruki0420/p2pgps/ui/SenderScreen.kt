@@ -2,6 +2,7 @@ package jp.haruki0420.p2pgps.ui
 
 import android.os.Build
 import android.provider.Settings
+import jp.haruki0420.p2pgps.BuildConfig
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -128,6 +129,7 @@ fun SenderScreen(
                 PermissionSection(permissions, onRequestPermissions)
                 DebugSection(state, onSimulate, onClearSimulation)
                 LogSection(logs, onClearLog)
+                AboutSection()
             }
         }
     }
@@ -849,6 +851,35 @@ private fun DebugSection(
 // ---------------------------------------------------------------------------
 // ログ
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun AboutSection() {
+    val colors = P2PTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "アプリ情報",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.ink,
+        )
+        Text(
+            text = "バージョン ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.inkSecondary,
+        )
+        Text(
+            text = "ライセンス MIT",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.inkSecondary,
+        )
+    }
+    HorizontalDivider(color = colors.line, thickness = 1.dp)
+}
 
 @Composable
 private fun LogSection(logs: List<LogEntry>, onClearLog: () -> Unit) {

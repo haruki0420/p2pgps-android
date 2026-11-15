@@ -86,11 +86,16 @@ class GpsSenderService : Service() {
         locationProvider = LocationProvider(this)
 
         stateJob = scope.launch {
+            var previousConnectedCentrals = 0
             gattServer.state.collect { ble ->
-                if (ble.connectedCentrals == 0 && streaming) {
+                // Only a real 1 -> 0 transition means the receiver went away.
+                // The initial advertising emission also has 0 centrals; resetting
+                // on every 0 would immediately undo streaming=true in startSender().
+                if (previousConnectedCentrals > 0 && ble.connectedCentrals == 0 && streaming) {
                     streaming = false
                     AppLog.i(TAG, "セントラルが切断されたため待機状態に戻します")
                 }
+                previousConnectedCentrals = ble.connectedCentrals
                 SenderStateHolder.update { it.copy(ble = ble) }
                 notifyStatus()
                 publishState(forceNotification = true)
@@ -228,6 +233,7 @@ class GpsSenderService : Service() {
             publishState(forceNotification = true)
             return
         }
+        clearError()
         startLocationUpdates()
         streaming = true
         ensureStreamLoop()
@@ -319,7 +325,7 @@ class GpsSenderService : Service() {
     private fun buildLocationPacket(fix: GpsFix, battery: BatteryStatus): LocationPacket {
         var flags = LocationPacket.FLAG_VALID_FIX
         val altitude = fix.altitudeMeters
-            ?.roundToInt()
+            ?.toInt()
             ?.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
         if (altitude != null) {
             flags = flags or LocationPacket.FLAG_ALTITUDE_VALID

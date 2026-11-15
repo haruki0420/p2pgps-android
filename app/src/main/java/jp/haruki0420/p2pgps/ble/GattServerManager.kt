@@ -15,7 +15,10 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
@@ -116,6 +119,20 @@ class GattServerManager(
     private val pendingServices = ArrayDeque<BluetoothGattService>()
     private var pendingServiceServer: BluetoothGattServer? = null
 
+    private var adapterReceiverRegistered = false
+    private val adapterStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                BluetoothAdapter.STATE_OFF -> handleAdapterOff()
+                BluetoothAdapter.STATE_ON -> AppLog.i(
+                    TAG,
+                    "Bluetooth が ON になりました。送信を再開するには送信を開始し直してください",
+                )
+            }
+        }
+    }
+
     /** Device Information Service など静的な read 値。 */
     private val staticValues = mutableMapOf<UUID, ByteArray>()
 
@@ -151,6 +168,7 @@ class GattServerManager(
             reportError("Bluetooth の権限がありません。Android の設定で権限を許可してから再試行してください。")
             return false
         }
+        registerAdapterReceiver()
         val manager = bluetoothManager
         if (manager == null || adapter == null) {
             reportError("この端末は Bluetooth LE に対応していません。BLE 対応の端末で実行してください。")
@@ -205,7 +223,59 @@ class GattServerManager(
     }
 
     /** GATT サーバーとアドバタイズを完全に終了する。 */
+    private fun registerAdapterReceiver() {
+        if (adapterReceiverRegistered) return
+        adapterReceiverRegistered = true
+        ContextCompat.registerReceiver(
+            context,
+            adapterStateReceiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
+    private fun unregisterAdapterReceiver() {
+        if (!adapterReceiverRegistered) return
+        adapterReceiverRegistered = false
+        try {
+            context.unregisterReceiver(adapterStateReceiver)
+        } catch (e: IllegalArgumentException) {
+            // 未登録なら無視する。
+        }
+    }
+
+    private fun handleAdapterOff() {
+        AppLog.w(TAG, "Bluetooth が OFF になりました。GATT サーバーを閉じます")
+        stopAdvertising()
+        val server = gattServer
+        gattServer = null
+        if (server != null) {
+            try {
+                server.clearServices()
+            } catch (e: SecurityException) {
+                // 無視する。
+            }
+            try {
+                server.close()
+            } catch (e: SecurityException) {
+                // 無視する。
+            }
+        }
+        synchronized(lock) {
+            connectedDevices.clear()
+            locationSubscribers.clear()
+            statusSubscribers.clear()
+            extendedSubscribers.clear()
+            pendingServices.clear()
+            pendingServiceServer = null
+        }
+        _state.value = BleState(
+            lastError = "Bluetooth が OFF になりました。ON にしてから送信を開始し直してください。",
+        )
+    }
+
     fun close() {
+        unregisterAdapterReceiver()
         stopAdvertising()
         val server = gattServer
         gattServer = null
@@ -348,7 +418,12 @@ class GattServerManager(
     private fun addNextPendingService(): Boolean {
         val server = pendingServiceServer ?: return false
         val next = pendingServices.removeFirstOrNull() ?: return true
-        val added = server.addService(next)
+        val added = try {
+            server.addService(next)
+        } catch (e: SecurityException) {
+            AppLog.e(TAG, "GATT サービスの追加で SecurityException: ${e.message}")
+            false
+        }
         if (!added) {
             AppLog.e(TAG, "GATT サービスの追加に失敗しました: ${next.uuid}")
             reportError("GATT サービスを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
@@ -402,9 +477,18 @@ class GattServerManager(
             }
         }
         try {
-            currentAdapter.setName(advertisedName)
+            val nameSet = currentAdapter.setName(advertisedName)
+            if (!nameSet) {
+                AppLog.e(TAG, "端末名を変更できませんでした（setName=false）")
+                restoreAdapterName()
+                reportError("送信元名を設定できませんでした。Bluetooth を OFF/ON してから再試行してください。")
+                return
+            }
         } catch (e: SecurityException) {
             AppLog.w(TAG, "端末名を変更できませんでした: ${e.message}")
+            restoreAdapterName()
+            reportError("送信元名を設定できませんでした。Bluetooth を OFF/ON してから再試行してください。")
+            return
         }
 
         val settings = AdvertiseSettings.Builder()
@@ -463,8 +547,11 @@ class GattServerManager(
         val currentAdapter = adapter ?: return
         val previousName = previousAdapterName ?: return
         try {
-            currentAdapter.setName(previousName)
-            previousAdapterName = null
+            if (currentAdapter.setName(previousName)) {
+                previousAdapterName = null
+            } else {
+                AppLog.w(TAG, "端末名を元に戻せませんでした（setName=false）。次の停止時に再試行します")
+            }
         } catch (e: SecurityException) {
             // 権限が無い場合は次の停止時に再試行する。
             AppLog.w(TAG, "端末名を元に戻せませんでした: ${e.message}")
@@ -628,19 +715,32 @@ class GattServerManager(
                 descriptor === extendedCccd -> GattUuids.EXTENDED
                 else -> null
             }
-
-            val enabled = when {
-                value == null || value.isEmpty() -> {
-                    AppLog.w(
-                        TAG,
-                        "CCCD 書き込みの値が空です。有効として扱います: characteristic=$characteristicUuid",
-                    )
-                    true
+            if (characteristicUuid == null) {
+                AppLog.w(
+                    TAG,
+                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}",
+                )
+                if (responseNeeded) {
+                    sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
                 }
-
-                else -> (value[0].toInt() and 0x01) != 0
+                return
             }
 
+            // CCCD writes are exactly two bytes (little-endian bit field) at
+            // offset 0. Reject malformed writes instead of guessing.
+            if (offset != 0 || value == null || value.size != 2) {
+                AppLog.w(
+                    TAG,
+                    "CCCD 書き込みの形式が不正です: characteristic=$characteristicUuid " +
+                        "offset=$offset size=${value?.size ?: -1}",
+                )
+                if (responseNeeded) {
+                    sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                }
+                return
+            }
+
+            val enabled = (value[0].toInt() and 0x01) != 0
             synchronized(lock) {
                 when (characteristicUuid) {
                     GattUuids.LOCATION ->
@@ -654,25 +754,6 @@ class GattServerManager(
                 }
             }
 
-            if (characteristicUuid == null) {
-                AppLog.w(
-                    TAG,
-                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}。" +
-                        "全購読として扱います",
-                )
-                synchronized(lock) {
-                    if (enabled) {
-                        locationSubscribers.add(device)
-                        statusSubscribers.add(device)
-                        extendedSubscribers.add(device)
-                    } else {
-                        locationSubscribers.remove(device)
-                        statusSubscribers.remove(device)
-                        extendedSubscribers.remove(device)
-                    }
-                }
-            }
-
             if (responseNeeded) {
                 sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
             }
@@ -680,9 +761,45 @@ class GattServerManager(
             AppLog.i(
                 TAG,
                 "CCCD 書き込み: characteristic=$characteristicUuid enabled=$enabled " +
-                    "value=${value?.joinToString(" ") { "%02X".format(it) } ?: "null"} " +
+                    "value=${value.joinToString(" ") { "%02X".format(it) }} " +
                     "subscribers(location=${locationSubscribers.size}, status=${statusSubscribers.size}, extended=${extendedSubscribers.size})",
             )
+        }
+
+        override fun onDescriptorReadRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            offset: Int,
+            descriptor: BluetoothGattDescriptor,
+        ) {
+            if (descriptor.uuid != GattUuids.CCCD) {
+                sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                return
+            }
+            val characteristicUuid = descriptor.characteristic?.uuid ?: when {
+                descriptor === locationCccd -> GattUuids.LOCATION
+                descriptor === statusCccd -> GattUuids.STATUS
+                descriptor === extendedCccd -> GattUuids.EXTENDED
+                else -> null
+            }
+            if (characteristicUuid == null) {
+                sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                return
+            }
+            val enabled = synchronized(lock) {
+                when (characteristicUuid) {
+                    GattUuids.LOCATION -> device in locationSubscribers
+                    GattUuids.STATUS -> device in statusSubscribers
+                    GattUuids.EXTENDED -> device in extendedSubscribers
+                    else -> false
+                }
+            }
+            val value = if (enabled) {
+                byteArrayOf(0x01, 0x00)
+            } else {
+                byteArrayOf(0x00, 0x00)
+            }
+            sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, value)
         }
 
         override fun onCharacteristicWriteRequest(

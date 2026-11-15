@@ -555,6 +555,16 @@ class GattServerManager(
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 // 133 などの GATT エラーを記録する（原因調査用）。
                 AppLog.w(TAG, "接続状態が変化しました: status=$status newState=$newState")
+                // A failed GATT connection must not be reported as connected.
+                // Remove any stale state and do not add the device.
+                synchronized(lock) {
+                    connectedDevices.remove(device)
+                    locationSubscribers.remove(device)
+                    statusSubscribers.remove(device)
+                    extendedSubscribers.remove(device)
+                }
+                updateConnectionState()
+                return
             }
             when (newState) {
                 BluetoothGatt.STATE_CONNECTED -> {

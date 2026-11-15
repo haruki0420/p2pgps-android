@@ -108,6 +108,14 @@ class GattServerManager(
     private var statusCccd: BluetoothGattDescriptor? = null
     private var extendedCccd: BluetoothGattDescriptor? = null
 
+    // BluetoothGattServer.addService() must not be called again before the
+    // previous service's onServiceAdded() callback arrives: the framework keeps
+    // only one pending service, so a second call would overwrite it and the
+    // first service (including its CCCD descriptors) would never be registered
+    // in the Java-side handle map. Add services one at a time through this queue.
+    private val pendingServices = ArrayDeque<BluetoothGattService>()
+    private var pendingServiceServer: BluetoothGattServer? = null
+
     /** Device Information Service など静的な read 値。 */
     private val staticValues = mutableMapOf<UUID, ByteArray>()
 
@@ -218,6 +226,8 @@ class GattServerManager(
             locationSubscribers.clear()
             statusSubscribers.clear()
             extendedSubscribers.clear()
+            pendingServices.clear()
+            pendingServiceServer = null
         }
         _state.value = BleState()
     }
@@ -307,10 +317,11 @@ class GattServerManager(
             staticStringCharacteristic(GattUuids.FIRMWARE_REVISION, BuildConfig.VERSION_NAME),
         )
 
-        val added = server.addService(service)
-        if (added) {
-            server.addService(deviceInformation)
-        }
+        pendingServices.clear()
+        pendingServices.add(service)
+        pendingServices.add(deviceInformation)
+        pendingServiceServer = server
+        val added = addNextPendingService()
         if (added) {
             locationCharacteristic = location
             statusCharacteristic = status
@@ -325,6 +336,22 @@ class GattServerManager(
         )
         if (!locationDescriptorAdded || !statusDescriptorAdded || !extendedDescriptorAdded) {
             reportError("CCCD ディスクリプタを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
+        }
+        return added
+    }
+
+    /**
+     * Adds the next queued service. Called once from [addServices] and again
+     * from `onServiceAdded` so the framework's single pending-service slot is
+     * never overwritten.
+     */
+    private fun addNextPendingService(): Boolean {
+        val server = pendingServiceServer ?: return false
+        val next = pendingServices.removeFirstOrNull() ?: return true
+        val added = server.addService(next)
+        if (!added) {
+            AppLog.e(TAG, "GATT サービスの追加に失敗しました: ${next.uuid}")
+            reportError("GATT サービスを登録できませんでした。Bluetooth を OFF/ON して再試行してください。")
         }
         return added
     }
@@ -554,8 +581,10 @@ class GattServerManager(
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 AppLog.i(TAG, "GATT サービスを登録しました: ${service.uuid}")
+                addNextPendingService()
             } else {
                 AppLog.e(TAG, "GATT サービスの登録に失敗しました: status=$status")
+                reportError("GATT サービスの登録に失敗しました。Bluetooth を OFF/ON して再試行してください。")
             }
         }
 

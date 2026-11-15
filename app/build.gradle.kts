@@ -12,8 +12,8 @@ android {
         applicationId = "jp.haruki0420.p2pgps"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.0.2"
     }
 
     buildTypes {

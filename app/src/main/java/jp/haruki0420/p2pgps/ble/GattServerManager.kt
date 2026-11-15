@@ -101,6 +101,13 @@ class GattServerManager(
     private val statusSubscribers = linkedSetOf<BluetoothDevice>()
     private val extendedSubscribers = linkedSetOf<BluetoothDevice>()
 
+    // Keep the CCCD descriptor instances so onDescriptorWriteRequest can map a
+    // write back to its characteristic even when Android returns a descriptor
+    // whose `characteristic` is null (observed on some OEM stacks).
+    private var locationCccd: BluetoothGattDescriptor? = null
+    private var statusCccd: BluetoothGattDescriptor? = null
+    private var extendedCccd: BluetoothGattDescriptor? = null
+
     /** Device Information Service など静的な read 値。 */
     private val staticValues = mutableMapOf<UUID, ByteArray>()
 
@@ -254,7 +261,8 @@ class GattServerManager(
             BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
-        location.addDescriptor(cccdDescriptor())
+        val locationCccdDescriptor = cccdDescriptor()
+        location.addDescriptor(locationCccdDescriptor)
 
         val control = BluetoothGattCharacteristic(
             GattUuids.CONTROL,
@@ -268,14 +276,16 @@ class GattServerManager(
             BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
-        status.addDescriptor(cccdDescriptor())
+        val statusCccdDescriptor = cccdDescriptor()
+        status.addDescriptor(statusCccdDescriptor)
 
         val extended = BluetoothGattCharacteristic(
             GattUuids.EXTENDED,
             BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
             BluetoothGattCharacteristic.PERMISSION_READ,
         )
-        extended.addDescriptor(cccdDescriptor())
+        val extendedCccdDescriptor = cccdDescriptor()
+        extended.addDescriptor(extendedCccdDescriptor)
 
         service.addCharacteristic(location)
         service.addCharacteristic(control)
@@ -305,6 +315,9 @@ class GattServerManager(
             locationCharacteristic = location
             statusCharacteristic = status
             extendedCharacteristic = extended
+            locationCccd = locationCccdDescriptor
+            statusCccd = statusCccdDescriptor
+            extendedCccd = extendedCccdDescriptor
         }
         return added
     }
@@ -554,9 +567,30 @@ class GattServerManager(
                 }
                 return
             }
-            val enabled = value != null && value.isNotEmpty() && (value[0].toInt() and 0x01) != 0
+
+            // Some Android stacks leave descriptor.characteristic null. Fall
+            // back to the CCCD instances we created in addServices().
+            val characteristicUuid = descriptor.characteristic?.uuid ?: when {
+                descriptor === locationCccd -> GattUuids.LOCATION
+                descriptor === statusCccd -> GattUuids.STATUS
+                descriptor === extendedCccd -> GattUuids.EXTENDED
+                else -> null
+            }
+
+            val enabled = when {
+                value == null || value.isEmpty() -> {
+                    AppLog.w(
+                        TAG,
+                        "CCCD 書き込みの値が空です。有効として扱います: characteristic=$characteristicUuid",
+                    )
+                    true
+                }
+
+                else -> (value[0].toInt() and 0x01) != 0
+            }
+
             synchronized(lock) {
-                when (descriptor.characteristic?.uuid) {
+                when (characteristicUuid) {
                     GattUuids.LOCATION ->
                         if (enabled) locationSubscribers.add(device) else locationSubscribers.remove(device)
 
@@ -567,11 +601,24 @@ class GattServerManager(
                         if (enabled) extendedSubscribers.add(device) else extendedSubscribers.remove(device)
                 }
             }
+
+            if (characteristicUuid == null) {
+                AppLog.w(
+                    TAG,
+                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}",
+                )
+            }
+
             if (responseNeeded) {
                 sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
             }
             updateConnectionState()
-            AppLog.i(TAG, "CCCD 書き込み: ${descriptor.characteristic?.uuid} enabled=$enabled")
+            AppLog.i(
+                TAG,
+                "CCCD 書き込み: characteristic=$characteristicUuid enabled=$enabled " +
+                    "value=${value?.joinToString(" ") { "%02X".format(it) } ?: "null"} " +
+                    "subscribers(location=${locationSubscribers.size}, status=${statusSubscribers.size}, extended=${extendedSubscribers.size})",
+            )
         }
 
         override fun onCharacteristicWriteRequest(

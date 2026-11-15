@@ -3,7 +3,7 @@
 > プロジェクト共通の正本は `p2pgps` モノレポ直下の `DESIGN.md`。本ファイルは Android 送信側リポジトリ向けに、
 > その視覚世界・トークン・レイアウトを Android（Jetpack Compose）へ翻訳したものです。
 > 実装より先にこのファイルが正であり、UI 変更はここを更新してから行います。
-> レンダリング検証は実機が無いため未実施（CI はコンパイルのみ）。
+> 全画面のレンダリング確認は未実施です（実機で確認してください）。
 
 ## Surface
 
@@ -144,4 +144,4 @@
 - `MaterialTheme` の `colorScheme` にマップしつつ、`P2PColors`（paper/surface/ink/line/pine/live など）を `CompositionLocal` で提供する（`ui/theme/Theme.kt`）。
 - Material Icons（outlined）のみ。`Roboto Mono` は `FontFamily.Monospace`。
 - OS 標準のコントロール（スイッチ・テキストフィールド・ボタン）はそのまま使う。
-- 実装メモの詳細は [`docs/design.md`](docs/design.md) を参照。
+- 実装メモの詳細は [`wiki/Design.md`](wiki/Design.md) を参照。

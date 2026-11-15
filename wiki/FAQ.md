@@ -42,7 +42,7 @@ v1 は認証・暗号化を行いません（Just Works 相当）。近距離の
 
 ## Q. 実機で動作確認されていますか？
 
-このリポジトリは CI でのコンパイルと JVM ユニットテストまでを保証します。BLE・前景サービス・UI の実機確認は未実施です。手順は [Getting Started](Getting-Started.md) と [Troubleshooting](Troubleshooting.md) を参照してください。
+BLE 購読・位置注入は Android 実機 + iPad で確認済みです。全画面 UI は未確認です。手順は [Getting Started](Getting-Started.md) と [Troubleshooting](Troubleshooting.md) を参照してください。
 
 ## Q. ライセンスは？
 

@@ -1,31 +1,28 @@
-# P2P GPS Android Sender — Wiki
+# P2P GPS Android Sender
 
-Android 端末を BLE 送信側（Sender）として使い、取得した GPS 位置を iPad の P2P GPS Receiver へ転送するアプリの Wiki です。
+Android の現在地を Bluetooth で iPad に送るアプリです。
 
-## この Wiki の構成
+## 使い方
 
-| ページ | 内容 |
-| :--- | :--- |
-| [Getting Started](Getting-Started.md) | ビルド・インストール・最初の接続 |
-| [Protocol](Protocol.md) | BLE GATT プロトコル v1 の要点 |
-| [Architecture](Architecture.md) | モジュール構成とデータフロー |
-| [Troubleshooting](Troubleshooting.md) | よくある問題と対処 |
-| [FAQ](FAQ.md) | よくある質問 |
+1. APK をインストールする
+2. 位置情報・Bluetooth・通知を許可する
+3. 「送信を開始」を押す
+4. iPad 側で送信元を選ぶ
 
-## 3 行でわかる概要
+## ページ
 
-- Android が **BLE ペリフェラル** として位置情報（20 bytes の Location Packet）を notify します。
-- iPad 側（[`p2pgps-ios`](https://github.com/haruki0420/p2pgps-ios) の Receiver モード）が接続し、`START` を書き込むと送信が始まります。
-- 送信は前景サービスで行うため、画面 OFF でも継続します。通知の「停止」でいつでも止められます。
+- [Getting Started](Getting-Started) — ビルド・インストール・最初の接続
+- [困ったとき](Troubleshooting)
+- [よくある質問](FAQ)
+- [Architecture](Architecture) — 開発者向け
+- [Design](Design) — 開発者向け
+- [Protocol](Protocol) — 開発者向け
+- [Testing](Testing) — 開発者向け
+- [Release Signing](Release-Signing) — 開発者向け
+- [License](License)
 
-## リポジトリ
+## 必要なもの
 
-- [`p2pgps-android`](https://github.com/haruki0420/p2pgps-android) — 本アプリ（MIT）
-- [`p2pgps-ios`](https://github.com/haruki0420/p2pgps-ios) — iPhone Sender / iPad Receiver（AGPL-3.0）
-- [`p2pgps-protocol`](https://github.com/haruki0420/p2pgps-protocol) — プロトコル仕様の正本・Python リファレンス実装・テストベクタ（MIT）
-
-## 前提
-
-- Android 8.0（API 26）以上・BLE 対応端末
-- 受信側は iPad + P2P GPS Receiver（Developer Mode / pairing file / LocalDevVPN などのセットアップが必要）
-- v1 は近距離・1 対 1・認証なし
+- Android 8.0 以降・Bluetooth 対応端末
+- 受信側の iPad に P2P GPS の受信アプリと準備（pairing file / LocalDevVPN / DDI）
+- 近距離・1 対 1 接続

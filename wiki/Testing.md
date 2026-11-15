@@ -63,7 +63,7 @@ CI と同等の環境をローカルに構築して確認しました。
 | Gradle | 9.8.2（Wrapper） |
 | `:app:testDebugUnitTest` | **54 tests / 0 failures**（ProtocolCodecTest 40、ProtocolVectorTest 5、LocationFilterTest 9） |
 | `:app:assembleDebug` | 成功（`app-debug.apk` 約 18.65 MB） |
-| `:app:assembleRelease` | 成功（R8 による縮小。`app-release-unsigned.apk` 約 1.26 MB） |
+| `:app:assembleRelease` | 成功（R8 による縮小。`app-release.apk` 約 1.27 MB（署名済み）） |
 | `:app:lintDebug` | 成功（Error 0。警告 12: 依存バージョン更新・targetSdk 35 の方針・`allowBackup` 非推奨・`mipmap-anydpi-v26` の冗長 qualifier） |
 | APK manifest | `applicationId=jp.haruki0420.p2pgps`、minSdk 26 / targetSdk 35 / compileSdk 36、`MainActivity` 起動可能、`GpsSenderService` の `foregroundServiceType=0x18`（connectedDevice + location）、位置 / Bluetooth（ADVERTISE・CONNECT）/ 前景サービス / 通知の権限を宣言（`BLUETOOTH_SCAN` は宣言しない） |
 

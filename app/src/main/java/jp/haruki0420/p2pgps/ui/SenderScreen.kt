@@ -461,14 +461,14 @@ private fun StateSection(state: SenderState) {
     val stateLabel = when {
         streaming -> "送信中"
         !state.serviceRunning -> "停止中"
-        state.streaming -> "受信側の接続待ち"
+        state.streaming -> "iPad の接続待ち"
         else -> "待機中"
     }
     val stateDetail = when {
         streaming -> "位置を ${state.intervalMs} ms 間隔で送信しています。"
         !state.serviceRunning -> "送信を開始すると、iPad から接続できるようになります。"
-        state.streaming -> "iPad が接続して購読を開始すると送信が始まります。"
-        else -> "受信側から START されると送信を開始します。"
+        state.streaming -> "iPad が接続すると送信が始まります。"
+        else -> "iPad から送信の指示が来ると開始します。"
     }
     Column(
         modifier = Modifier
@@ -533,15 +533,15 @@ private fun BleSection(state: SenderState) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "BLE",
+            text = "Bluetooth",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = colors.ink,
         )
         BleRow(
             icon = Icons.Outlined.Bluetooth,
-            label = "アドバタイズ",
-            value = if (state.ble.advertising) "アドバタイズ中" else "停止",
+            label = "見つけられる状態",
+            value = if (state.ble.advertising) "公開中" else "停止",
             active = state.ble.advertising,
         )
         BleRow(
@@ -552,14 +552,9 @@ private fun BleSection(state: SenderState) {
         )
         BleRow(
             icon = Icons.Outlined.Notifications,
-            label = "購読",
-            value = "購読 ${if (state.ble.locationSubscribed) 1 else 0} 台",
+            label = "受信中の iPad",
+            value = "${if (state.ble.locationSubscribed) 1 else 0} 台",
             active = state.ble.locationSubscribed,
-        )
-        Text(
-            text = "MTU ${state.ble.mtu} bytes",
-            style = P2PType.numeric,
-            color = colors.inkSecondary,
         )
         val bleError = state.ble.lastError
         if (bleError != null) {
@@ -617,7 +612,7 @@ private fun IntervalSection(state: SenderState, onIntervalChange: (Int) -> Unit)
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "送信レート（ms）",
+            text = "送信間隔",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = colors.ink,
@@ -628,7 +623,14 @@ private fun IntervalSection(state: SenderState, onIntervalChange: (Int) -> Unit)
         ) {
             INTERVAL_OPTIONS.forEach { option ->
                 IntervalOption(
-                    label = option.toString(),
+                    label = when (option) {
+                        200 -> "0.2 秒"
+                        500 -> "0.5 秒"
+                        1000 -> "1 秒"
+                        2000 -> "2 秒"
+                        5000 -> "5 秒"
+                        else -> "${option} ms"
+                    },
                     selected = state.intervalMs == option,
                     enabled = state.serviceRunning,
                     onClick = { onIntervalChange(option) },
@@ -637,7 +639,7 @@ private fun IntervalSection(state: SenderState, onIntervalChange: (Int) -> Unit)
             }
         }
         Text(
-            text = "受信側から START / SET_INTERVAL で変更された場合もここに反映されます。",
+            text = "iPad 側からも変更できます。",
             style = MaterialTheme.typography.bodySmall,
             color = colors.inkSecondary,
         )
@@ -784,7 +786,7 @@ private fun DebugSection(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "デバッグ",
+            text = "開発者向け（通常は使いません）",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = colors.ink,
@@ -1047,7 +1049,7 @@ private fun formatCoordinate(value: Double): String = String.format(Locale.US, "
 /**
  * Reduce Motion の設定（`ANIMATOR_DURATION_SCALE == 0`）を読む。
  *
- * 設定変更は画面再生成まで反映されない（既知の制約。docs/design.md に記載）。
+ * 設定変更は画面再生成まで反映されない（既知の制約。wiki/Design.md に記載）。
  */
 @Composable
 private fun rememberReduceMotion(): Boolean {

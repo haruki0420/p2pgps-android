@@ -96,9 +96,14 @@ object NotificationHelper {
         }
         val connection = when {
             state.ble.connectedCentrals == 0 -> "未接続"
-            state.ble.locationSubscribed -> "接続中・購読あり"
-            else -> "接続中・購読待ち"
+            state.ble.locationSubscribed -> "接続中"
+            else -> "接続中・受信待ち"
         }
-        return "$location / ${state.intervalMs}ms / $connection"
+        val interval = if (state.intervalMs % 1000 == 0) {
+            "${state.intervalMs / 1000} 秒ごと"
+        } else {
+            String.format(Locale.US, "%.1f 秒ごと", state.intervalMs / 1000.0)
+        }
+        return "$location / $interval / $connection"
     }
 }

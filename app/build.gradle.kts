@@ -7,8 +7,8 @@ plugins {
 // Release builds stamp versionName/versionCode from the git tag in CI
 // (`-PappVersionName=... -PappVersionCode=...`). The fallbacks are only for
 // local builds; keep them in sync with the latest release.
-val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.6"
-val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 10006
+val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "1.0.7"
+val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull() ?: 10007
 
 // Release signing is configured from the environment in CI (GitHub Secrets).
 // Local builds without these variables produce an unsigned release APK.

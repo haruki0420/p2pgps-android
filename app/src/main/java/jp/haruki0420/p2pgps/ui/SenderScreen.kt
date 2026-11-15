@@ -3,7 +3,6 @@ package jp.haruki0420.p2pgps.ui
 import android.os.Build
 import android.provider.Settings
 import jp.haruki0420.p2pgps.BuildConfig
-import java.util.Locale
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween

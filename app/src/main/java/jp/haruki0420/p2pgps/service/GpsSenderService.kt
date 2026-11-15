@@ -73,6 +73,8 @@ class GpsSenderService : Service() {
 
     private var streamJob: Job? = null
     private var locationJob: Job? = null
+    /** 現在の位置更新要求間隔（ms）。送信間隔に合わせて 100〜1000 ms の範囲で使う。 */
+    private var locationMinTimeMs = 1_000L
     private var heartbeatJob: Job? = null
     private var stateJob: Job? = null
 
@@ -137,6 +139,7 @@ class GpsSenderService : Service() {
                 val requested = intent.getIntExtra(EXTRA_INTERVAL_MS, intervalMs)
                 intervalMs = ControlCommand.clampInterval(requested)
                 AppLog.i(TAG, "送信間隔を変更しました: ${intervalMs}ms")
+                if (streaming) startLocationUpdates()
                 notifyStatus(force = true)
                 publishState(forceNotification = true)
             }
@@ -265,7 +268,14 @@ class GpsSenderService : Service() {
     }
 
     private fun startLocationUpdates() {
-        if (locationJob?.isActive == true) return
+        // Request fixes at the send rate (clamped to 100–1000 ms). Without this
+        // a 500 ms send interval would only repeat the same 1 Hz fix twice.
+        val minTimeMs = intervalMs.coerceIn(100, 1_000).toLong()
+        if (locationJob?.isActive == true && locationMinTimeMs == minTimeMs) return
+        locationJob?.cancel()
+        locationJob = null
+        locationMinTimeMs = minTimeMs
+        AppLog.i(TAG, "位置更新間隔を設定しました: ${minTimeMs}ms")
         latestFix = locationProvider.lastKnownFix()?.let { fix ->
             when (val result = locationFilter.accept(fix)) {
                 is FilterResult.Accepted -> result.fix
@@ -273,7 +283,7 @@ class GpsSenderService : Service() {
             }
         }
         locationJob = scope.launch {
-            locationProvider.fixes()
+            locationProvider.fixes(minTimeMs = minTimeMs)
                 .catch { e -> AppLog.e(TAG, "位置情報の取得に失敗しました: ${e.message}") }
                 .collect { fix ->
                     when (val result = locationFilter.accept(fix)) {
@@ -530,6 +540,7 @@ class GpsSenderService : Service() {
                 intervalMs = command.intervalMs
                 clearError()
                 AppLog.i(TAG, "SET_INTERVAL: ${intervalMs}ms")
+                if (streaming) startLocationUpdates()
                 notifyStatus(force = true)
                 publishState(forceNotification = true)
             }

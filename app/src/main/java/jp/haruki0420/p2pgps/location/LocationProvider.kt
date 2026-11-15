@@ -98,7 +98,24 @@ class LocationProvider(private val context: Context) {
                 trySend(location.toGpsFix())
             }
 
-            override fun onProviderEnabled(provider: String) = Unit
+            override fun onProviderEnabled(provider: String) {
+                if (provider !in providers()) return
+                // Re-request after the user turns GPS/network location back on;
+                // the original request did not cover a provider that was off.
+                try {
+                    manager.requestLocationUpdates(
+                        provider,
+                        minTimeMs,
+                        minDistanceM,
+                        this,
+                        Looper.getMainLooper(),
+                    )
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "位置更新を再要求できませんでした: provider=$provider", e)
+                } catch (e: IllegalArgumentException) {
+                    Log.w(TAG, "存在しない provider です: $provider")
+                }
+            }
 
             override fun onProviderDisabled(provider: String) = Unit
 

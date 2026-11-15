@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import jp.haruki0420.p2pgps.ble.GattServerManager
@@ -91,7 +92,10 @@ class GpsSenderService : Service() {
                 // Only a real 1 -> 0 transition means the receiver went away.
                 // The initial advertising emission also has 0 centrals; resetting
                 // on every 0 would immediately undo streaming=true in startSender().
-                if (previousConnectedCentrals > 0 && ble.connectedCentrals == 0 && streaming) {
+                // A Bluetooth-off transition also stops the stream even when no
+                // central was connected.
+                val bluetoothOff = ble.lastError?.startsWith("Bluetooth が OFF") == true
+                if (streaming && ((previousConnectedCentrals > 0 && ble.connectedCentrals == 0) || bluetoothOff)) {
                     streaming = false
                     AppLog.i(TAG, "セントラルが切断されたため待機状態に戻します")
                 }
@@ -112,6 +116,13 @@ class GpsSenderService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (!enterForeground()) {
+            // onDestroy resets the published state, so surface the failure
+            // before the service disappears.
+            Toast.makeText(
+                this,
+                lastErrorMessage ?: "前景サービスを開始できませんでした。権限を確認してください。",
+                Toast.LENGTH_LONG,
+            ).show()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -498,6 +509,9 @@ class GpsSenderService : Service() {
                 intervalMs = command.intervalMs
                 streaming = true
                 clearError()
+                // A completed location job (e.g. location was disabled at
+                // service start) is restarted here.
+                startLocationUpdates()
                 ensureStreamLoop()
                 AppLog.i(TAG, "START: interval=${intervalMs}ms")
                 notifyStatus(force = true)

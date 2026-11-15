@@ -480,12 +480,14 @@ class GattServerManager(
             val nameSet = currentAdapter.setName(advertisedName)
             if (!nameSet) {
                 AppLog.e(TAG, "端末名を変更できませんでした（setName=false）")
+                advertiser = null
                 restoreAdapterName()
                 reportError("送信元名を設定できませんでした。Bluetooth を OFF/ON してから再試行してください。")
                 return
             }
         } catch (e: SecurityException) {
             AppLog.w(TAG, "端末名を変更できませんでした: ${e.message}")
+            advertiser = null
             restoreAdapterName()
             reportError("送信元名を設定できませんでした。Bluetooth を OFF/ON してから再試行してください。")
             return
@@ -708,22 +710,19 @@ class GattServerManager(
             }
 
             // Some Android stacks leave descriptor.characteristic null. Fall
-            // back to the CCCD instances we created in addServices().
+            // back to the CCCD instances we created in addServices(), first by
+            // reference and then by the instance ID assigned by onServiceAdded.
             val characteristicUuid = descriptor.characteristic?.uuid ?: when {
                 descriptor === locationCccd -> GattUuids.LOCATION
                 descriptor === statusCccd -> GattUuids.STATUS
                 descriptor === extendedCccd -> GattUuids.EXTENDED
+                descriptor.instanceId != 0 && descriptor.instanceId == locationCccd?.instanceId ->
+                    GattUuids.LOCATION
+                descriptor.instanceId != 0 && descriptor.instanceId == statusCccd?.instanceId ->
+                    GattUuids.STATUS
+                descriptor.instanceId != 0 && descriptor.instanceId == extendedCccd?.instanceId ->
+                    GattUuids.EXTENDED
                 else -> null
-            }
-            if (characteristicUuid == null) {
-                AppLog.w(
-                    TAG,
-                    "CCCD 書き込みの対象キャラクタリスティックを特定できませんでした: descriptor=${descriptor.uuid}",
-                )
-                if (responseNeeded) {
-                    sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
-                }
-                return
             }
 
             // CCCD writes are exactly two bytes (little-endian bit field) at
@@ -741,6 +740,33 @@ class GattServerManager(
             }
 
             val enabled = (value[0].toInt() and 0x01) != 0
+            if (characteristicUuid == null) {
+                // Last-resort compatibility for OEM stacks that hand us a
+                // descriptor copy we cannot identify. The stock Android path
+                // identifies the characteristic above, so this is rare.
+                AppLog.w(
+                    TAG,
+                    "CCCD 書き込みの対象を特定できませんでした。互換フォールバックで全購読を更新します: " +
+                        "descriptor=${descriptor.uuid} instanceId=${descriptor.instanceId}",
+                )
+                synchronized(lock) {
+                    if (enabled) {
+                        locationSubscribers.add(device)
+                        statusSubscribers.add(device)
+                        extendedSubscribers.add(device)
+                    } else {
+                        locationSubscribers.remove(device)
+                        statusSubscribers.remove(device)
+                        extendedSubscribers.remove(device)
+                    }
+                }
+                if (responseNeeded) {
+                    sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
+                }
+                updateConnectionState()
+                return
+            }
+
             synchronized(lock) {
                 when (characteristicUuid) {
                     GattUuids.LOCATION ->
@@ -776,10 +802,20 @@ class GattServerManager(
                 sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
                 return
             }
+            if (offset != 0) {
+                sendResponse(device, requestId, BluetoothGatt.GATT_INVALID_OFFSET, offset, null)
+                return
+            }
             val characteristicUuid = descriptor.characteristic?.uuid ?: when {
                 descriptor === locationCccd -> GattUuids.LOCATION
                 descriptor === statusCccd -> GattUuids.STATUS
                 descriptor === extendedCccd -> GattUuids.EXTENDED
+                descriptor.instanceId != 0 && descriptor.instanceId == locationCccd?.instanceId ->
+                    GattUuids.LOCATION
+                descriptor.instanceId != 0 && descriptor.instanceId == statusCccd?.instanceId ->
+                    GattUuids.STATUS
+                descriptor.instanceId != 0 && descriptor.instanceId == extendedCccd?.instanceId ->
+                    GattUuids.EXTENDED
                 else -> null
             }
             if (characteristicUuid == null) {

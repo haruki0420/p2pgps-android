@@ -24,3 +24,41 @@ local.properties
 .tmp/
 # ローカル検証用ツール（JDK / Android SDK など）。コミットしない。
 .tmp-tools/
+
+# Secrets / signing
+*.mobiledevicepairing
+*.mobiledevicepair
+pairingFile.plist
+*.p12
+*.p8
+*.mobileprovision
+*.ipa
+.env
+.env.*
+!.env.example
+
+# Work / reports / temporary
+*.bak
+*.orig
+*~
+*.tmp
+*.swp
+screenshots/
+reports/
+notes/
+work/
+tmp/
+scratch/
+drafts/
+*.gpx
+*.geojson
+*.csv
+
+# Repo-specific
+.vscode/
+captures/
+*.hprof
+release/
+app/release/
+lint-results*
+*.sarif

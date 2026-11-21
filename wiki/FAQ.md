@@ -42,7 +42,7 @@ v1 は認証・暗号化を行いません。近距離の第三者が偽の位�
 
 ## 実機で動作確認されていますか？
 
-Bluetooth での位置の受け渡しと、iPad の位置の書き換えは Android 実機 + iPad で確認済みです。全画面 UI は未確認です。
+実機での確認範囲（BLE 接続・位置の書き換え・全画面 UI）はハブ Wiki の [Status](https://github.com/haruki0420/p2pgps/wiki/Status) にまとめています。
 
 ## ライセンスは？
 

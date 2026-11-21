@@ -21,7 +21,7 @@ JVM ユニットテストは Android 実機・エミュレータ不要で実行�
 ### カバレッジの考え方
 
 - **プロトコル層**は Android に依存しない純 Kotlin のため、encode/decode の全フィールドと検証ロジックを JVM テストで担保します。
-- 共有テストベクタは `app/src/test/resources/vectors/` に手動ミラーしています（自動同期ではない）。正本更新時の同期方法は [`app/src/test/resources/vectors/README.md`](../app/src/test/resources/vectors/README.md) を参照してください。
+- 共有テストベクタは `app/src/test/resources/vectors/` に手動ミラーしています（自動同期ではない）。正本更新時の同期方法は [`app/src/test/resources/vectors/README.md`](https://github.com/haruki0420/p2pgps-android/blob/main/app/src/test/resources/vectors/README.md) を参照してください。
 - **位置フィルタ**も純 Kotlin のため JVM テストで担保します。
 - **BLE ペリフェラル / 前景サービス / UI** は Android フレームワークに依存するため、CI ではコンパイル（`assembleDebug`）と lint までを保証します。実機でのみ検証可能です。
 

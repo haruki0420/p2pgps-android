@@ -141,7 +141,7 @@ app/src/main/java/jp/haruki0420/p2pgps/
 - モーションは fix 到着時の座標 120ms クロスフェードと主ボタン押下の 0.98 スケールのみ。Reduce Motion（`Settings.Global.ANIMATOR_DURATION_SCALE == 0`）で無効化する（設定変更は画面再生成まで反映されない）。
 - 権限は Android 12（Bluetooth）と Android 13（通知）で要求内容を切り替え（`Permissions.required()`）。
 - 送信開始に必須なのは「位置情報 + Bluetooth」のみ。通知が拒否されても送信は継続できる。
-- デザインの正本はリポジトリ直下の `DESIGN.md` / `PRODUCT.md`、実装メモは [`wiki/Design.md`](design.md)。
+- デザインの正本はハブ Wiki の [Design](https://github.com/haruki0420/p2pgps/wiki/Design) と [Product](https://github.com/haruki0420/p2pgps/wiki/Product)。Android 固有の実装メモは [Design](Design)。
 
 ## 8. テスト戦略
 

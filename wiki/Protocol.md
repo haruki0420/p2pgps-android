@@ -153,7 +153,7 @@
 `ProtocolVectorTest.kt` が全ベクタ（location 13 / extended 5 / status 5 / control 22 / sequences 5）を
 読み込んで encode / decode / validate を検証します。
 
-- ミラー元と同期方法は [`app/src/test/resources/vectors/README.md`](../app/src/test/resources/vectors/README.md) を参照。
+- ミラー元と同期方法は [`app/src/test/resources/vectors/README.md`](https://github.com/haruki0420/p2pgps-android/blob/main/app/src/test/resources/vectors/README.md) を参照。
 - CI では `p2pgps-protocol` を checkout しないため自動同期ではありません。正本が更新されたら手動でコピーし直します。
 - Control は `hex`（生値）と `normalized_interval_ms`（仕様 §5.1 の適用値）を突き合わせます。
 

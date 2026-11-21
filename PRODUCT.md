@@ -1,7 +1,8 @@
 # Product — p2pgps-android
 
-> プロジェクト共通の正本は `p2pgps` モノレポ直下の `PRODUCT.md`。本ファイルは Android 送信側リポジトリ向けに、
-> その内容を Android の実装スコープへ落とし込んだものです。矛盾がある場合はプロジェクト版を優先します。
+> プロジェクト共通の正本はハブ Wiki の [Product](https://github.com/haruki0420/p2pgps/wiki/Product)。
+> 本ファイルは Android 送信側に固有の差分（対象ユーザー・スコープ・制約）だけを記録します。
+> 矛盾がある場合はハブ Wiki を優先します。
 
 ## Platform
 

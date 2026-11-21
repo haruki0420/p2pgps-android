@@ -1,7 +1,7 @@
 # Design — p2pgps-android
 
-> プロジェクト共通の正本は `p2pgps` モノレポ直下の `DESIGN.md`。本ファイルは Android 送信側リポジトリ向けに、
-> その視覚世界・トークン・レイアウトを Android（Jetpack Compose）へ翻訳したものです。
+> プロジェクト共通の正本はハブ Wiki の [Design](https://github.com/haruki0420/p2pgps/wiki/Design)。
+> 本ファイルは Android 送信側に固有の差分（Material 3 マッピング、Compose 実装、前景サービス、端末名変更など）に絞って記録します。
 > 実装より先にこのファイルが正であり、UI 変更はここを更新してから行います。
 > 全画面のレンダリング確認は未実施です（実機で確認してください）。
 

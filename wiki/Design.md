@@ -2,7 +2,7 @@
 
 最終更新: 2026-11-15
 
-正本はリポジトリ直下の [`DESIGN.md`](../DESIGN.md)（プロジェクト共通の視覚世界・トークン・レイアウト・モーション・コピー）と [`PRODUCT.md`](../PRODUCT.md) です。本ドキュメントは、その Android 側の実装（`ui/theme/Theme.kt` と `ui/SenderScreen.kt`）への落とし込みを記録します。
+共通の正本はハブ Wiki の [Design](https://github.com/haruki0420/p2pgps/wiki/Design)（視覚世界・トークン・レイアウト・モーション・コピー）と [Product](https://github.com/haruki0420/p2pgps/wiki/Product) です。本ドキュメントは、その Android 側の実装（`ui/theme/Theme.kt` と `ui/SenderScreen.kt`）への落とし込みを記録します。リポジトリ内の Android 固有メモは [`DESIGN.md`](https://github.com/haruki0420/p2pgps-android/blob/main/DESIGN.md) と [`PRODUCT.md`](https://github.com/haruki0420/p2pgps-android/blob/main/PRODUCT.md)。
 
 ## 1. 視覚世界
 
